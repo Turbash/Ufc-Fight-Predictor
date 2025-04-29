@@ -1,65 +1,79 @@
 # UFC Fight Prediction Application
 
-This application predicts the outcome of UFC fights based on fighter statistics and fight details. It uses machine learning models to predict both the winner of the fight (red or blue corner) and the type of finish (KO/TKO, Submission, or Decision).
+This application predicts the outcome of UFC fights based on fighter statistics and fight details. It leverages machine learning models to predict both the winner of the fight (red or blue corner) and the type of finish (KO/TKO, Submission, or Decision).
+
+## Features
+
+- **Winner Prediction**: Predicts which fighter (red or blue corner) is likely to win.
+- **Finish Type Prediction**: Predicts the method of victory (KO/TKO, Submission, or Decision).
+- **Interactive Visualization**: Displays prediction confidence and other insights using Streamlit.
+- **Customizable Models**: Includes scripts for training and fine-tuning machine learning models.
 
 ## Prerequisites
 
 - Python 3.7+
-- Required libraries (listed in requirements.txt)
+- Required libraries (listed in `requirements.txt`)
 
 ## Setup Instructions
 
-1. Clone this repository
-2. Install the required dependencies:
+1. **Clone the Repository**:
+   ```bash
+   git clone https://github.com/your-username/ufc-prediction-app.git
+   cd ufc-prediction-app
    ```
+
+2. **Install Dependencies**:
+   ```bash
    pip install -r requirements.txt
    ```
-3. Ensure the UFC dataset is in the data folder as `data/ufc-master.csv`
-4. Train the predictive models:
-   ```
+
+3. **Prepare the Dataset**:
+   - Ensure the UFC dataset is in the `data` folder as `data/ufc-master.csv`.
+
+4. **Train the Models**:
+   ```bash
    python train_models.py
    ```
-5. Run the Streamlit app:
-   ```
+
+5. **Run the Application**:
+   ```bash
    streamlit run app.py
    ```
 
 ## How It Works
 
-The application uses two machine learning models:
+1. **Data Preprocessing**:
+   - Cleans and preprocesses the UFC dataset to handle missing values and outliers.
+   - Scales features for better model performance.
 
-1. **Winner Prediction Model**: An XGBoost classifier that predicts whether the red or blue fighter will win.
-2. **Finish Prediction Model**: A Logistic Regression classifier that predicts how the fight will end (KO/TKO, Submission, or Decision).
+2. **Machine Learning Models**:
+   - Trains models (e.g., Logistic Regression, SVM) to predict fight outcomes.
+   - Saves trained models for use in the application.
 
-These models were trained on historical UFC fight data with features including fighter statistics, physical attributes, and fight context.
+3. **Streamlit Application**:
+   - Provides an interactive interface for users to input fight details and view predictions.
+   - Displays prediction confidence and visualizations.
 
-## Key Features
+## Folder Structure
 
-- Input fighter statistics for both red and blue corner fighters
-- Visualize win and finish probabilities
-- Easy-to-use interface for predicting fight outcomes
-- Interactive visualization of prediction results
+```
+ufc-prediction-app/
+│
+├── app.py                 # Main Streamlit application
+├── train_models.py        # Script for training models
+├── requirements.txt       # Python dependencies
+├── README.md              # Project documentation
+├── data/                  # Folder for datasets
+├── models/                # Folder for saved models
+└── utils/                 # Utility scripts (preprocessing, visualization, etc.)
+```
 
-## Input Features
+## Future Improvements
 
-The application uses various fighter statistics as input, including:
+- Add support for additional fight statistics and features.
+- Improve model accuracy with advanced algorithms (e.g., XGBoost, Neural Networks).
+- Deploy the application online for public use.
 
-- Fighter odds and expected values
-- Win and loss streaks
-- Striking statistics (significant strikes landed, accuracy)
-- Grappling statistics (submission attempts, takedowns)
-- Physical attributes (height, reach, weight)
-- Age
-- Previous win methods (KO, submission, decision)
+---
 
-## Dataset
-
-The models are trained on the UFC Master dataset, which contains historical fight data with detailed statistics for both fighters and fight outcomes.
-
-## Model Performance
-
-The accuracy metrics for each model are displayed during training and saved with the models.
-
-## Author
-
-UFC Fight Prediction App - 2023
+**UFC Fight Prediction App - 2025**
