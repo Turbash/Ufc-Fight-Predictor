@@ -1,79 +1,94 @@
-# UFC Fight Prediction Application
+# UFC Fight Predictor 🥊
 
-This application predicts the outcome of UFC fights based on fighter statistics and fight details. It leverages machine learning models to predict both the winner of the fight (red or blue corner) and the type of finish (KO/TKO, Submission, or Decision).
+A machine learning application that predicts UFC fight outcomes based on fighter statistics and historical data.
 
-## Features
+![UFC Logo](https://upload.wikimedia.org/wikipedia/commons/thumb/9/92/UFC_Logo.svg/2560px-UFC_Logo.svg.png)
 
-- **Winner Prediction**: Predicts which fighter (red or blue corner) is likely to win.
-- **Finish Type Prediction**: Predicts the method of victory (KO/TKO, Submission, or Decision).
-- **Interactive Visualization**: Displays prediction confidence and other insights using Streamlit.
-- **Customizable Models**: Includes scripts for training and fine-tuning machine learning models.
+## 📋 Features
 
-## Prerequisites
+- Predict fight winners with confidence percentages
+- Predict fight finish methods (KO/TKO, Submission, Decision)
+- Interactive UI for inputting fighter statistics
+- Visual representation of prediction results
+- Fighter comparison dashboard
+- Comprehensive fighter stats input (physical attributes, fight history, performance metrics)
 
-- Python 3.7+
-- Required libraries (listed in `requirements.txt`)
+## 🚀 Technologies Used
 
-## Setup Instructions
+- Python
+- Streamlit
+- Pandas
+- NumPy
+- Plotly
+- Scikit-learn
+- Joblib
 
-1. **Clone the Repository**:
-   ```bash
-   git clone https://github.com/your-username/ufc-prediction-app.git
-   cd ufc-prediction-app
+## 📊 How It Works
+
+The UFC Fight Predictor uses trained machine learning models to analyze fighter statistics and predict:
+1. The likely winner between two fighters
+2. The probable method of victory (KO/TKO, Submission, or Decision)
+
+The models take into account numerous factors such as:
+- Fighter physical attributes (height, reach, age)
+- Fighting style and statistics (striking accuracy, takedowns, etc.)
+- Past performance (win/loss records, winning methods)
+- Current form (win/loss streaks)
+- Betting odds
+
+## 🛠️ Installation
+
+1. Clone the repository:
+   ```
+   git clone https://github.com/Turbash/Ufc-Fight-Predictor.git
+   cd Ufc-Fight-Predictor
    ```
 
-2. **Install Dependencies**:
-   ```bash
+2. Create a virtual environment (optional but recommended):
+   ```
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   ```
+
+3. Install required packages:
+   ```
    pip install -r requirements.txt
    ```
 
-3. **Prepare the Dataset**:
-   - Ensure the UFC dataset is in the `data` folder as `data/ufc-master.csv`.
-
-4. **Train the Models**:
-   ```bash
+4. Train the models (if not already included):
+   ```
    python train_models.py
    ```
 
-5. **Run the Application**:
-   ```bash
+5. Run the Streamlit app:
+   ```
    streamlit run app.py
    ```
 
-## How It Works
+## 📝 Usage
 
-1. **Data Preprocessing**:
-   - Cleans and preprocesses the UFC dataset to handle missing values and outliers.
-   - Scales features for better model performance.
+1. Launch the application using the command above
+2. Input fighter statistics for both the red and blue corner fighters
+3. Add fight-specific information such as odds and weight class
+4. Click "Predict Fight Outcome" to see the results
+5. Review the visualizations and fighter comparison
 
-2. **Machine Learning Models**:
-   - Trains models (e.g., Logistic Regression, SVM) to predict fight outcomes.
-   - Saves trained models for use in the application.
+## 📚 Project Structure
 
-3. **Streamlit Application**:
-   - Provides an interactive interface for users to input fight details and view predictions.
-   - Displays prediction confidence and visualizations.
+- `app.py`: Main Streamlit application
+- `train_models.py`: Script to train prediction models
+- `models/`: Directory containing trained models
+- `utils/`: Utility functions for visualization and data processing
+- `about.py`: About page content
 
-## Folder Structure
+## 📜 License
 
-```
-ufc-prediction-app/
-│
-├── app.py                 # Main Streamlit application
-├── train_models.py        # Script for training models
-├── requirements.txt       # Python dependencies
-├── README.md              # Project documentation
-├── data/                  # Folder for datasets
-├── models/                # Folder for saved models
-└── utils/                 # Utility scripts (preprocessing, visualization, etc.)
-```
+MIT License
 
-## Future Improvements
+## 👨‍💻 Author
 
-- Add support for additional fight statistics and features.
-- Improve model accuracy with advanced algorithms (e.g., XGBoost, Neural Networks).
-- Deploy the application online for public use.
+[Turbash](https://github.com/Turbash)
 
----
+## 🤝 Contributing
 
-**UFC Fight Prediction App - 2025**
+Contributions, issues, and feature requests are welcome!

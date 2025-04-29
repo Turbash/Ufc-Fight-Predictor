@@ -33,33 +33,31 @@ def display_classification_report(y_true, y_pred):
     
 def plot_prediction_confidence(probabilities, classes, prediction, title="Prediction Confidence"):
     """
-    Plot prediction confidence instead of raw probabilities
+    Plot the confidence scores for a prediction.
     
-    Parameters:
-    -----------
-    probabilities : array-like
-        Probabilities from the model prediction
-    classes : list
-        Class labels
-    prediction : int or str
-        The predicted class
-    title : str, optional
-        Title for the plot
+    Args:
+        probabilities: Array of prediction probabilities
+        classes: Class labels
+        prediction: The predicted class
+        title: Plot title
     """
-    # Convert probabilities to confidence percentages
+    # Convert probabilities to percentages
     confidence = [round(prob * 100, 1) for prob in probabilities]
     
+    # Create the plot
     plt.figure(figsize=(10, 6))
-    bars = plt.bar(classes, confidence, color=['#3498db', '#e74c3c', '#2ecc71'])
+    bars = plt.bar(classes, confidence, color=['lightblue' if c != prediction else 'blue' for c in classes])
     
     # Highlight the predicted class
-    pred_index = classes.index(prediction) if isinstance(prediction, str) else prediction
-    bars[pred_index].set_color('#f39c12')
+    for i, bar in enumerate(bars):
+        if classes[i] == prediction:
+            bar.set_color('blue')
     
-    plt.title(title, fontsize=16)
-    plt.xlabel('Outcome', fontsize=12)
-    plt.ylabel('Confidence (%)', fontsize=12)
-    
+    # Add labels and title
+    plt.xlabel('Outcome')
+    plt.ylabel('Confidence (%)')
+    plt.title(title)
+        
     # Add percentage labels on top of bars
     for i, confidence_val in enumerate(confidence):
         plt.text(i, confidence_val + 1, f"{confidence_val}%", 
@@ -71,13 +69,23 @@ def plot_prediction_confidence(probabilities, classes, prediction, title="Predic
 
 def display_fight_prediction(winner_model, finish_model, finish_scaler, fight_data, red_fighter, blue_fighter):
     # Get features that the winner model was trained on
-    if hasattr(winner_model, 'get_booster'):
-        winner_features = winner_model.get_booster().feature_names
-    else:
-        # For models that don't have direct feature name access
-        winner_features = [col for col in fight_data.columns if col not in [
-            'RedDecOdds', 'BlueDecOdds', 'RSubOdds', 'BSubOdds', 'RKOOdds', 'BKOOdds'
-        ]]
+    try:
+        import joblib
+        winner_features = joblib.load('models/winner_features.pkl')
+    except Exception as e:
+        # Fallback if feature list can't be loaded
+        if hasattr(winner_model, 'get_booster'):
+            winner_features = winner_model.get_booster().feature_names
+        else:
+            # For models that don't have direct feature name access
+            winner_features = [col for col in fight_data.columns if col not in [
+                'RedDecOdds', 'BlueDecOdds', 'RSubOdds', 'BSubOdds', 'RKOOdds', 'BKOOdds'
+            ]]
+    
+    # Ensure all required columns exist in fight_data
+    for col in winner_features:
+        if col not in fight_data.columns:
+            fight_data[col] = 0  # Default to 0 for missing columns
     
     # Filter fight_data to only include columns expected by the winner model
     winner_data = fight_data[winner_features]

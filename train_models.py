@@ -3,18 +3,22 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, label_binarize
 from sklearn.svm import SVC
 from sklearn.linear_model import LogisticRegression
 import xgboost as xgb
-from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, roc_auc_score, roc_curve, auc
 import joblib
 import os
 
 def train_models():
     print("Loading data...")
     # Load the dataset
-    df = pd.read_csv("data/ufc-master.csv")
+    df = pd.read_csv("assets/ufc-master.csv")
+    
+    # Create models directory at the beginning to avoid FileNotFoundError
+    print("Setting up directories...")
+    os.makedirs('models', exist_ok=True)
     
     print("Preprocessing data...")
     # Basic preprocessing (handle missing values)
@@ -108,23 +112,58 @@ def train_models():
         X_winner, y_winner, test_size=0.2, random_state=42
     )
     
-    # Using XGBoost for winner prediction
-    xgb_winner = xgb.XGBClassifier(
-        objective='multi:softmax',
-        num_class=2,
-        eval_metric='mlogloss',
-        random_state=42,
-        use_label_encoder=False
-    )
+    # Step 1: Ensure that only numerical columns are selected
+    X_train_numeric = X_train_winner.select_dtypes(include=[np.number])
     
-    # Train the model
-    xgb_winner.fit(X_train_winner, y_train_winner)
-    
-    # Evaluate the model
-    y_pred_winner = xgb_winner.predict(X_test_winner)
-    accuracy = accuracy_score(y_test_winner, y_pred_winner)
-    print(f"Winner Model Accuracy: {accuracy:.4f}")
-    print(classification_report(y_test_winner, y_pred_winner))
+    # Save the exact columns used for training - this is critical for prediction consistency
+    winner_numeric_columns = list(X_train_numeric.columns)
+
+    # Step 2: Calculate Q1 (25th percentile) and Q3 (75th percentile)
+    Q1 = X_train_numeric.quantile(0.25)
+    Q3 = X_train_numeric.quantile(0.75)
+    IQR = Q3 - Q1
+
+    # Step 3: Detect outliers
+    outliers = ((X_train_numeric < (Q1 - 1.5 * IQR)) | (X_train_numeric > (Q3 + 1.5 * IQR)))
+
+    # Step 4: Remove outliers from the data
+    X_train_no_outliers = X_train_numeric[~outliers.any(axis=1)]
+    y_train_no_outliers = y_train_winner[~outliers.any(axis=1)]
+
+    # Step 5: Standardize the data (scaling)
+    winner_scaler = StandardScaler()
+    X_train_scaled = winner_scaler.fit_transform(X_train_no_outliers)
+
+    # Step 6: Train the SVM model
+    svm = SVC(kernel='linear', random_state=42, probability=True)
+    svm.fit(X_train_scaled, y_train_no_outliers)
+
+    # Step 7: Make predictions
+    X_test_numeric = X_test_winner[winner_numeric_columns]  # Use the same columns as training
+    y_pred_winner = svm.predict(winner_scaler.transform(X_test_numeric))
+
+    # Step 8: Evaluate the model
+    print("SVM Model (No Outliers) - Accuracy:", accuracy_score(y_test_winner, y_pred_winner))
+    print("\nSVM Model (No Outliers) - Classification Report:\n", classification_report(y_test_winner, y_pred_winner))
+    print("\nSVM Model (No Outliers) - Confusion Matrix:\n", confusion_matrix(y_test_winner, y_pred_winner))
+
+    # Calculate and plot ROC curve
+    y_scores = svm.decision_function(winner_scaler.transform(X_test_numeric))
+    roc_auc = roc_auc_score(y_test_winner, y_scores)
+    print(f"AUC-ROC Score: {roc_auc:.4f}")
+
+    # Plot ROC Curve
+    fpr, tpr, thresholds = roc_curve(y_test_winner, y_scores)
+    plt.figure(figsize=(8,6))
+    plt.plot(fpr, tpr, color='blue', label=f'AUC = {roc_auc:.2f}')
+    plt.plot([0, 1], [0, 1], color='red', linestyle='--')  # Random guessing line
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title('ROC Curve (SVM, No Outliers)')
+    plt.legend(loc='lower right')
+    plt.grid()
+    plt.savefig('models/winner_model_roc.png')
+    plt.close()
     
     print("Training finish type prediction model...")
     # Finish prediction model (Logistic Regression)
@@ -147,36 +186,78 @@ def train_models():
     X_finish = df_finish.drop(columns=['FinishNumeric'])
     y_finish = df_finish['FinishNumeric']
     
-    # Split data
+    # Save the exact columns used for finish prediction - for consistency
+    finish_numeric_columns = list(X_finish.columns)
+    
+    # 1. Standardize the features
+    finish_scaler = StandardScaler()
+    X_scaled = finish_scaler.fit_transform(X_finish)
+
+    # 2. Split the data
     X_train_finish, X_test_finish, y_train_finish, y_test_finish = train_test_split(
-        X_finish, y_finish, test_size=0.2, random_state=42
+        X_scaled, y_finish, test_size=0.2, random_state=42
     )
-    
-    # Scale the data for logistic regression
-    scaler = StandardScaler()
-    X_train_finish_scaled = scaler.fit_transform(X_train_finish)
-    X_test_finish_scaled = scaler.transform(X_test_finish)
-    
-    # Train logistic regression model
+
+    # 3. Fit Logistic Regression
     log_reg = LogisticRegression(max_iter=1000, random_state=42)
-    log_reg.fit(X_train_finish_scaled, y_train_finish)
-    
-    # Evaluate the model
-    y_pred_finish = log_reg.predict(X_test_finish_scaled)
+    log_reg.fit(X_train_finish, y_train_finish)
+
+    # 4. Predictions and Evaluation
+    y_pred_finish = log_reg.predict(X_test_finish)
     accuracy = accuracy_score(y_test_finish, y_pred_finish)
-    print(f"Finish Model Accuracy: {accuracy:.4f}")
-    print(classification_report(y_test_finish, y_pred_finish))
+    print(f"Logistic Regression Finish Prediction - Accuracy: {accuracy:.4f}")
+    print("\nClassification Report:\n", classification_report(y_test_finish, y_pred_finish))
+    print("\nConfusion Matrix:\n", confusion_matrix(y_test_finish, y_pred_finish))
+
+    # 5. AUC-ROC Score (for multiclass)
+    y_proba = log_reg.predict_proba(X_test_finish)  # Probabilities for all classes
+    auc_score = roc_auc_score(y_test_finish, y_proba, multi_class='ovr')  # Multi-class One-vs-Rest strategy
+    print(f"\nAUC-ROC Score (Multiclass OVR): {auc_score:.4f}")
+
+    # 6. Plot AUC-ROC Curve
+    # Binarize the labels for ROC curve
+    classes = np.unique(y_test_finish)
+    y_test_bin = label_binarize(y_test_finish, classes=classes)
+
+    # Compute ROC curve and ROC area for each class
+    fpr = dict()
+    tpr = dict()
+    roc_auc = dict()
+
+    for i in range(len(classes)):
+        fpr[i], tpr[i], _ = roc_curve(y_test_bin[:, i], y_proba[:, i])
+        roc_auc[i] = auc(fpr[i], tpr[i])
+
+    # Plot all ROC curves
+    plt.figure(figsize=(10, 8))
+
+    colors = ['blue', 'green', 'red']
+    for i, color in zip(range(len(classes)), colors):
+        plt.plot(fpr[i], tpr[i], color=color, lw=2,
+                 label=f'ROC curve for class {classes[i]} (area = {roc_auc[i]:.2f})')
+
+    plt.plot([0, 1], [0, 1], 'k--', lw=2)  # Random guess line
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel('False Positive Rate', fontsize=14)
+    plt.ylabel('True Positive Rate', fontsize=14)
+    plt.title('Multiclass ROC Curve (Finish Prediction)', fontsize=16)
+    plt.legend(loc="lower right")
+    plt.grid()
+    plt.savefig('models/finish_model_roc.png')
+    plt.close()
     
     # Save models
     print("Saving models...")
     os.makedirs('models', exist_ok=True)
-    joblib.dump(xgb_winner, 'models/winner_model.pkl')
+    joblib.dump(svm, 'models/winner_model.pkl')
+    joblib.dump(winner_scaler, 'models/winner_scaler.pkl')
     joblib.dump(log_reg, 'models/finish_model.pkl')
-    joblib.dump(scaler, 'models/finish_scaler.pkl')
+    joblib.dump(finish_scaler, 'models/finish_scaler.pkl')
     
-    # Also save feature lists to avoid mismatch in future
-    joblib.dump(list(X_winner.columns), 'models/winner_features.pkl')
-    joblib.dump(list(X_finish.columns), 'models/finish_features.pkl')
+    # Save the exact feature lists to ensure prediction uses the same features
+    joblib.dump(winner_numeric_columns, 'models/winner_features.pkl')
+    joblib.dump(finish_numeric_columns, 'models/finish_features.pkl')
     print("Models trained and saved successfully!")
 
 if __name__ == "__main__":

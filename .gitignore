@@ -1,35 +1,131 @@
-# Python cache files
+### Python ###
+# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
-*.pyo
+*$py.class
+*.so
+.Python
 
-# Environment files
-.env
-*.env
+# Distribution / packaging
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
 
-# Jupyter Notebook checkpoints
-.ipynb_checkpoints/
+# Testing
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+pytest-report.xml
+junit/
 
-# Model files
-models/*.pkl
-
-# Data files
-data/*.csv
-!data/README.md  # Allow README.md in the data folder if it exists
-
-# Logs and temporary files
+# Logging
 *.log
-*.tmp
-*.bak
-*.swp
+pip-log.txt
+pip-delete-this-directory.txt
 
-# OS generated files
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+pythonenv*
+
+### IDEs and Editors ###
+# VSCode
+.vscode/
+*.code-workspace
+.history/
+
+# PyCharm
+.idea/
+*.iml
+*.iws
+*.ipr
+.idea_modules/
+
+# Jupyter
+.ipynb_checkpoints
+.jupyter/
+profile_default/
+ipython_config.py
+
+### Machine Learning / Data Science ###
+# Ignore all model files and directories
+models/
+# Ignore entire data directory
+data/
+# Ignore CSV files
+*.csv
+
+# Visualizations
+figures/
+plots/
+*.png
+*.jpg
+*.jpeg
+*.svg
+*.pdf
+
+### Misc ###
+# Logs and databases
+*.sql
+*.sqlite
+*.sqlite3
+db.sqlite3-journal
+
+# OS specific files
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
 
-# Streamlit cache
-.streamlit/
+# Virtual Environment
+.python-version
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
 
-# Distribution files
-.dist/
-build/
+# Dependency locks
+Pipfile.lock
+
+# Local configurations
+config.local.py
+settings.local.py
+.env.local
+
+# Temporary files
+tmp/
+temp/
+.~*
+*.swp
+*.swo

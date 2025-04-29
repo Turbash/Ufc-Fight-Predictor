@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
+import plotly.graph_objects as go
 import joblib
 import os
 from utils.visualization import display_fight_prediction, plot_prediction_confidence
@@ -236,27 +236,48 @@ def show_prediction_page():
     if st.button("Predict Fight Outcome", key="predict_button"):
         with st.spinner("Analyzing fight data..."):
             # Make predictions
-            # Get feature names that the winner model was trained on
-            if hasattr(winner_model, 'get_booster'):
-                # For XGBoost models
-                winner_features = winner_model.get_booster().feature_names
-            else:
-                # For other models that don't have direct feature name access
-                winner_features = [col for col in fight_data.columns if col not in [
-                    'RedDecOdds', 'BlueDecOdds', 'RSubOdds', 'BSubOdds', 'RKOOdds', 'BKOOdds'
-                ]]
-            
-            # Filter fight data to include only features the winner model was trained on
-            winner_input_data = fight_data[winner_features]
-            
-            # Make winner prediction with filtered data
-            winner_pred = winner_model.predict(winner_input_data)[0]
-            winner_proba = winner_model.predict_proba(winner_input_data)[0]
+            try:
+                # Load the exact features the model was trained on
+                winner_features = joblib.load('models/winner_features.pkl')
+                winner_scaler = joblib.load('models/winner_scaler.pkl')
+                
+                # Ensure all required columns exist in fight_data
+                for col in winner_features:
+                    if col not in fight_data.columns:
+                        fight_data[col] = 0  # Default to 0 for missing columns
+                
+                # Filter and scale the data exactly as it was done during training
+                winner_input_data = fight_data[winner_features]
+                winner_input_scaled = winner_scaler.transform(winner_input_data)
+                
+                # Make winner prediction with scaled data
+                winner_pred = winner_model.predict(winner_input_scaled)[0]
+                winner_proba = winner_model.predict_proba(winner_input_scaled)[0]
+            except Exception as e:
+                st.error(f"Error making prediction: {str(e)}")
+                st.write("Falling back to unscaled prediction method")
+                
+                # Fallback to current method if there's a problem
+                if hasattr(winner_model, 'get_booster'):
+                    winner_features = winner_model.get_booster().feature_names
+                else:
+                    winner_features = [col for col in fight_data.columns if col not in [
+                        'RedDecOdds', 'BlueDecOdds', 'RSubOdds', 'BSubOdds', 'RKOOdds', 'BKOOdds'
+                    ]]
+                
+                winner_input_data = fight_data[winner_features]
+                winner_pred = winner_model.predict(winner_input_data)[0]
+                winner_proba = winner_model.predict_proba(winner_input_data)[0]
             
             # For finish model, use the scaler and all available features
             scaled_data = finish_scaler.transform(fight_data)
             finish_pred = finish_model.predict(scaled_data)[0]
             finish_proba = finish_model.predict_proba(scaled_data)[0]
+            
+            # Display visualizations using custom gauge charts instead of bar plots
+            st.subheader("Prediction Visualizations")
+            
+            # Instead of using HTML, use Streamlit's native components
             
             # Get prediction results
             winner_name = red_fighter_name if winner_pred == 0 else blue_fighter_name
@@ -266,48 +287,112 @@ def show_prediction_page():
             finish_type = finish_types[finish_pred]
             finish_confidence = round(finish_proba[finish_pred] * 100, 1)
             
-            # Determine confidence level class
-            winner_conf_class = "confidence-high" if winner_confidence >= 70 else "confidence-medium" if winner_confidence >= 55 else "confidence-low"
-            finish_conf_class = "confidence-high" if finish_confidence >= 70 else "confidence-medium" if finish_confidence >= 55 else "confidence-low"
+            # Create fighter cards using Streamlit columns
+            st.markdown("### Fighter Win Probability")
             
-            # Display predictions
-            st.markdown("<div class='prediction-box'>", unsafe_allow_html=True)
-            st.markdown(f"## Fight Prediction: {red_fighter_name} vs {blue_fighter_name}")
+            fighter_cols = st.columns(2)
             
-            st.markdown(f"### Winner Prediction")
-            st.markdown(f"**Predicted Winner:** <span class='{'fighter-red' if winner_pred == 0 else 'fighter-blue'}'>{winner_name}</span>", unsafe_allow_html=True)
-            st.markdown(f"**Confidence:** <span class='{winner_conf_class}'>{winner_confidence}%</span>", unsafe_allow_html=True)
+            # Red fighter card
+            with fighter_cols[0]:
+                st.markdown(f"##### <span style='color:#E50914;font-size:1.4rem;'>{red_fighter_name}</span>", unsafe_allow_html=True)
+                
+                # Create a styled container for the card
+                red_container = st.container()
+                red_container.markdown("""
+                <style>
+                .red-card {
+                    background: linear-gradient(145deg, #1a1e25 0%, #2c3e50 100%);
+                    border-radius: 10px;
+                    padding: 15px;
+                    border-top: 4px solid #E50914;
+                    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+                }
+                </style>
+                """, unsafe_allow_html=True)
+                
+                # Display content in the styled container
+                with red_container:
+                    st.metric("Win Probability", f"{round(winner_proba[0] * 100, 1)}%")
+                    st.progress(float(winner_proba[0]))
+                    if winner_pred == 0:
+                        st.success("🏆 Predicted Winner")
             
-            st.markdown(f"### Finish Prediction")
-            st.markdown(f"**Predicted Finish:** {finish_type}")
-            st.markdown(f"**Confidence:** <span class='{finish_conf_class}'>{finish_confidence}%</span>", unsafe_allow_html=True)
-            st.markdown("</div>", unsafe_allow_html=True)
+            # Blue fighter card
+            with fighter_cols[1]:
+                st.markdown(f"##### <span style='color:#3498db;font-size:1.4rem;'>{blue_fighter_name}</span>", unsafe_allow_html=True)
+                
+                # Create a styled container for the card
+                blue_container = st.container()
+                blue_container.markdown("""
+                <style>
+                .blue-card {
+                    background: linear-gradient(145deg, #1a1e25 0%, #2c3e50 100%);
+                    border-radius: 10px;
+                    padding: 15px;
+                    border-top: 4px solid #3498db;
+                    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+                }
+                </style>
+                """, unsafe_allow_html=True)
+                
+                # Display content in the styled container
+                with blue_container:
+                    st.metric("Win Probability", f"{round(winner_proba[1] * 100, 1)}%")
+                    st.progress(float(winner_proba[1]))
+                    if winner_pred == 1:
+                        st.success("🏆 Predicted Winner")
             
-            # Display visualizations
-            st.subheader("Prediction Visualizations")
-            col_viz1, col_viz2 = st.columns(2)
+            # Display finish prediction using Streamlit components
+            st.markdown("### Predicted Fight Outcome")
+            st.info(f"**{finish_type}** with {finish_confidence}% confidence")
             
-            with col_viz1:
-                fig1, ax1 = plt.subplots(figsize=(6, 4))
-                labels = [red_fighter_name, blue_fighter_name]
-                confidence_vals = [winner_proba[0] * 100, winner_proba[1] * 100]
-                colors = ['#E50914', '#3498db']
-                bars = ax1.bar(labels, confidence_vals, color=colors)
-                ax1.set_ylim(0, 100)
-                ax1.set_title('Winner Prediction Confidence (%)')
-                ax1.bar_label(bars, fmt='%.1f%%')
-                st.pyplot(fig1)
+            # Finish type probability bars
+            finish_cols = st.columns(3)
             
-            with col_viz2:
-                fig2, ax2 = plt.subplots(figsize=(6, 4))
-                finish_labels = finish_types
-                finish_confidence_vals = [finish_proba[i] * 100 for i in range(len(finish_types))]
-                finish_colors = ['#e74c3c', '#2ecc71', '#3498db']
-                bars = ax2.bar(finish_labels, finish_confidence_vals, color=finish_colors)
-                ax2.set_ylim(0, 100)
-                ax2.set_title('Finish Type Prediction Confidence (%)')
-                ax2.bar_label(bars, fmt='%.1f%%')
-                st.pyplot(fig2)
+            # KO/TKO probability
+            with finish_cols[0]:
+                st.markdown("##### KO/TKO")
+                ko_prob = round(finish_proba[0] * 100, 1)
+                st.metric("Probability", f"{ko_prob}%")
+                ko_bar = st.progress(float(finish_proba[0]))
+                if finish_pred == 0:
+                    st.markdown("✅ **Predicted Method**")
+            
+            # Submission probability
+            with finish_cols[1]:
+                st.markdown("##### Submission")
+                sub_prob = round(finish_proba[1] * 100, 1)
+                st.metric("Probability", f"{sub_prob}%")
+                sub_bar = st.progress(float(finish_proba[1]))
+                if finish_pred == 1:
+                    st.markdown("✅ **Predicted Method**")
+            
+            # Decision probability
+            with finish_cols[2]:
+                st.markdown("##### Decision")
+                dec_prob = round(finish_proba[2] * 100, 1)
+                st.metric("Probability", f"{dec_prob}%")
+                dec_bar = st.progress(float(finish_proba[2]))
+                if finish_pred == 2:
+                    st.markdown("✅ **Predicted Method**")
+            
+            # Display some additional insights based on the predictions
+            st.subheader("Fight Analysis")
+            st.write(f"Based on our model, {winner_name} is expected to win this fight via {finish_type.lower()} " +
+                    f"with {finish_confidence}% confidence. Key factors contributing to this prediction include " +
+                    f"{'favorable odds, fighting experience, and physical advantages' if winner_confidence > 65 else 'slight edge in key statistics'}.")
+            
+            # Add fighter comparison for key stats
+            st.markdown("<h3>Fighter Comparison</h3>", unsafe_allow_html=True)
+            comparison_data = {
+                "Stat": ["Win Streak", "Sig. Strikes/Min", "Accuracy", "Takedowns/Fight", "KO Wins", "Sub Wins", "Height", "Reach"],
+                red_fighter_name: [red_win_streak, red_sig_str, f"{red_sig_str_pct*100:.1f}%", red_td_landed, 
+                                  red_ko_wins, red_sub_wins, f"{red_height} cm", f"{red_reach} cm"],
+                blue_fighter_name: [blue_win_streak, blue_sig_str, f"{blue_sig_str_pct*100:.1f}%", blue_td_landed, 
+                                   blue_ko_wins, blue_sub_wins, f"{blue_height} cm", f"{blue_reach} cm"]
+            }
+            comparison_df = pd.DataFrame(comparison_data)
+            st.dataframe(comparison_df, use_container_width=True, hide_index=True)
 
 if __name__ == "__main__":
     main()
