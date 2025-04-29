@@ -1,0 +1,35 @@
+# Python cache files
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Environment files
+.env
+*.env
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Model files
+models/*.pkl
+
+# Data files
+data/*.csv
+!data/README.md  # Allow README.md in the data folder if it exists
+
+# Logs and temporary files
+*.log
+*.tmp
+*.bak
+*.swp
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Streamlit cache
+.streamlit/
+
+# Distribution files
+.dist/
+build/
