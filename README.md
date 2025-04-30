@@ -26,8 +26,8 @@ A machine learning application that predicts UFC fight outcomes based on fighter
 ## 📊 How It Works
 
 The UFC Fight Predictor uses trained machine learning models to analyze fighter statistics and predict:
-1. The likely winner between two fighters
-2. The probable method of victory (KO/TKO, Submission, or Decision)
+1. The likely winner between two fighters (using simple Logistic Regression, ~66% accuracy)
+2. The probable method of victory (KO/TKO, Submission, or Decision) (~55% accuracy)
 
 The models take into account numerous factors such as:
 - Fighter physical attributes (height, reach, age)
@@ -72,6 +72,12 @@ The models take into account numerous factors such as:
 3. Add fight-specific information such as odds and weight class
 4. Click "Predict Fight Outcome" to see the results
 5. Review the visualizations and fighter comparison
+
+## 📈 Model Performance
+
+Our models currently achieve:
+- **Winner prediction**: ~66% accuracy (AUC-ROC: 0.71)
+- **Finish method**: ~55% accuracy (AUC-ROC: 0.65)
 
 ## 📚 Project Structure
 

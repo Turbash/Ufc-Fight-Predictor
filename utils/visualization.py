@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.metrics import roc_curve, auc, confusion_matrix, classification_report
+import numpy as np
 
 def plot_roc_curve(y_true, y_scores):
     fpr, tpr, _ = roc_curve(y_true, y_scores)
@@ -41,6 +42,21 @@ def plot_prediction_confidence(probabilities, classes, prediction, title="Predic
         prediction: The predicted class
         title: Plot title
     """
+    # Ensure probabilities are proper values between 0 and 1
+    # Sometimes models return extreme values that need normalization
+    probabilities = np.array(probabilities)
+    
+    # If all probabilities are very close to 0 or 1, adjust them
+    if np.max(probabilities) > 0.99 and np.min(probabilities) < 0.01:
+        # Apply softmax to renormalize extreme probabilities
+        def softmax(x):
+            e_x = np.exp(x - np.max(x))
+            return e_x / e_x.sum()
+        
+        # Convert probabilities to logits (approximate) and apply softmax
+        logits = np.log(probabilities / (1 - probabilities + 1e-10))
+        probabilities = softmax(logits)
+    
     # Convert probabilities to percentages
     confidence = [round(prob * 100, 1) for prob in probabilities]
     
@@ -90,20 +106,59 @@ def display_fight_prediction(winner_model, finish_model, finish_scaler, fight_da
     # Filter fight_data to only include columns expected by the winner model
     winner_data = fight_data[winner_features]
     
-    # Predict winner
-    winner_pred = winner_model.predict(winner_data)[0]
-    winner_proba = winner_model.predict_proba(winner_data)[0]
+    # Apply scaling to winner data using the saved scaler
+    try:
+        # Load the winner scaler
+        winner_scaler = joblib.load('models/winner_scaler.pkl')
+        winner_data_scaled = winner_scaler.transform(winner_data)
+        
+        # Predict using scaled data
+        winner_pred = winner_model.predict(winner_data_scaled)[0]
+        winner_proba = winner_model.predict_proba(winner_data_scaled)[0]
+        
+        # Apply temperature scaling to adjust overconfident predictions
+        if np.max(winner_proba) > 0.95:
+            temperature = 2.0  # Higher temperature gives softer probabilities
+            logits = np.log(winner_proba / (1 - winner_proba + 1e-10))
+            softmax_probs = np.exp(logits / temperature) / np.sum(np.exp(logits / temperature))
+            winner_proba = softmax_probs
+    except:
+        # Fall back to unscaled prediction if scaler can't be loaded
+        winner_pred = winner_model.predict(winner_data)[0]
+        winner_proba = winner_model.predict_proba(winner_data)[0]
     
     # Determine winner name based on prediction (0 = Red, 1 = Blue)
     winner_name = red_fighter if winner_pred == 0 else blue_fighter
     
-    # For finish model, we can use all features since the scaling will handle dimensionality
-    finish_data = finish_scaler.transform(fight_data)
+    # For finish model, use features and apply scaling
+    try:
+        finish_features = joblib.load('models/finish_features.pkl')
+        finish_data = fight_data[finish_features]
+        
+        # Load and apply finish scaler
+        finish_scaler = joblib.load('models/finish_scaler.pkl')
+        finish_data_scaled = finish_scaler.transform(finish_data)
+        
+        # Predict using scaled data
+        finish_pred = finish_model.predict(finish_data_scaled)[0]
+        finish_proba = finish_model.predict_proba(finish_data_scaled)[0]
+    except:
+        # Fall back to unscaled prediction if there's an issue
+        if finish_features is None:
+            finish_data = winner_data  # Use same features as winner if finish features not found
+        else:
+            finish_data = fight_data[finish_features]
+            
+        finish_pred = finish_model.predict(finish_data)[0]
+        finish_proba = finish_model.predict_proba(finish_data)[0]
     
-    # Predict finish type
-    finish_pred = finish_model.predict(finish_data)[0]
-    finish_proba = finish_model.predict_proba(finish_data)[0]
-    
+    # Apply similar temperature scaling to finish probabilities if needed
+    if np.max(finish_proba) > 0.95:
+        temperature = 2.0
+        logits = np.log(finish_proba / (1 - finish_proba + 1e-10))
+        softmax_probs = np.exp(logits / temperature) / np.sum(np.exp(logits / temperature))
+        finish_proba = softmax_probs
+
     finish_types = ['KO/TKO', 'Submission', 'Decision']
     finish_type = finish_types[finish_pred]
     

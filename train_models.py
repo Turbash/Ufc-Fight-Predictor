@@ -3,8 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler, label_binarize
-from sklearn.svm import SVC
+from sklearn.preprocessing import label_binarize, StandardScaler
 from sklearn.linear_model import LogisticRegression
 import xgboost as xgb
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, roc_auc_score, roc_curve, auc
@@ -88,7 +87,7 @@ def train_models():
     df = df.drop(columns=[col for col in leakage_columns if col in df.columns])
     
     print("Training winner prediction model...")
-    # Winner prediction model (SVM)
+    # Winner prediction model (Logistic Regression with Scaling)
     winner_features = [
         'RedOdds', 'BlueOdds', 'RedExpectedValue', 'BlueExpectedValue',
         'TitleBout', 'NumberOfRounds', 'RedCurrentLoseStreak', 'BlueCurrentLoseStreak',
@@ -107,48 +106,31 @@ def train_models():
     X_winner = df_winner.drop(columns=['WinnerNumeric'])
     y_winner = df_winner['WinnerNumeric']
     
-    # Split data
+    # Save the exact columns used for training
+    winner_numeric_columns = list(X_winner.columns)
+    
+    # Train/test split
     X_train_winner, X_test_winner, y_train_winner, y_test_winner = train_test_split(
         X_winner, y_winner, test_size=0.2, random_state=42
     )
     
-    # Step 1: Ensure that only numerical columns are selected
-    X_train_numeric = X_train_winner.select_dtypes(include=[np.number])
-    
-    # Save the exact columns used for training - this is critical for prediction consistency
-    winner_numeric_columns = list(X_train_numeric.columns)
-
-    # Step 2: Calculate Q1 (25th percentile) and Q3 (75th percentile)
-    Q1 = X_train_numeric.quantile(0.25)
-    Q3 = X_train_numeric.quantile(0.75)
-    IQR = Q3 - Q1
-
-    # Step 3: Detect outliers
-    outliers = ((X_train_numeric < (Q1 - 1.5 * IQR)) | (X_train_numeric > (Q3 + 1.5 * IQR)))
-
-    # Step 4: Remove outliers from the data
-    X_train_no_outliers = X_train_numeric[~outliers.any(axis=1)]
-    y_train_no_outliers = y_train_winner[~outliers.any(axis=1)]
-
-    # Step 5: Standardize the data (scaling)
+    # Apply scaling to winner model data
     winner_scaler = StandardScaler()
-    X_train_scaled = winner_scaler.fit_transform(X_train_no_outliers)
+    X_train_winner_scaled = winner_scaler.fit_transform(X_train_winner)
+    X_test_winner_scaled = winner_scaler.transform(X_test_winner)
 
-    # Step 6: Train the SVM model
-    svm = SVC(kernel='linear', random_state=42, probability=True)
-    svm.fit(X_train_scaled, y_train_no_outliers)
+    # Train a Logistic Regression model with scaled data
+    log_reg_winner = LogisticRegression(random_state=42, max_iter=1000)
+    log_reg_winner.fit(X_train_winner_scaled, y_train_winner)
 
-    # Step 7: Make predictions
-    X_test_numeric = X_test_winner[winner_numeric_columns]  # Use the same columns as training
-    y_pred_winner = svm.predict(winner_scaler.transform(X_test_numeric))
-
-    # Step 8: Evaluate the model
-    print("SVM Model (No Outliers) - Accuracy:", accuracy_score(y_test_winner, y_pred_winner))
-    print("\nSVM Model (No Outliers) - Classification Report:\n", classification_report(y_test_winner, y_pred_winner))
-    print("\nSVM Model (No Outliers) - Confusion Matrix:\n", confusion_matrix(y_test_winner, y_pred_winner))
+    # Evaluate on scaled test data
+    y_pred_winner = log_reg_winner.predict(X_test_winner_scaled)
+    print("Logistic Regression Model (Scaled) - Accuracy:", accuracy_score(y_test_winner, y_pred_winner))
+    print("\nLogistic Regression Model (Scaled) - Classification Report:\n", classification_report(y_test_winner, y_pred_winner))
+    print("\nLogistic Regression Model (Scaled) - Confusion Matrix:\n", confusion_matrix(y_test_winner, y_pred_winner))
 
     # Calculate and plot ROC curve
-    y_scores = svm.decision_function(winner_scaler.transform(X_test_numeric))
+    y_scores = log_reg_winner.decision_function(X_test_winner_scaled)
     roc_auc = roc_auc_score(y_test_winner, y_scores)
     print(f"AUC-ROC Score: {roc_auc:.4f}")
 
@@ -159,14 +141,14 @@ def train_models():
     plt.plot([0, 1], [0, 1], color='red', linestyle='--')  # Random guessing line
     plt.xlabel('False Positive Rate')
     plt.ylabel('True Positive Rate')
-    plt.title('ROC Curve (SVM, No Outliers)')
+    plt.title('ROC Curve (Logistic Regression - Scaled)')
     plt.legend(loc='lower right')
     plt.grid()
     plt.savefig('models/winner_model_roc.png')
     plt.close()
     
     print("Training finish type prediction model...")
-    # Finish prediction model (Logistic Regression)
+    # Finish prediction model (Logistic Regression with Scaling)
     finish_features = [
         'RedOdds', 'BlueOdds', 'RedExpectedValue', 'BlueExpectedValue',
         'TitleBout', 'NumberOfRounds', 'RedCurrentLoseStreak', 'BlueCurrentLoseStreak',
@@ -186,40 +168,39 @@ def train_models():
     X_finish = df_finish.drop(columns=['FinishNumeric'])
     y_finish = df_finish['FinishNumeric']
     
-    # Save the exact columns used for finish prediction - for consistency
+    # Save the exact columns used for finish prediction
     finish_numeric_columns = list(X_finish.columns)
     
-    # 1. Standardize the features
-    finish_scaler = StandardScaler()
-    X_scaled = finish_scaler.fit_transform(X_finish)
-
-    # 2. Split the data
+    # Train/test split
     X_train_finish, X_test_finish, y_train_finish, y_test_finish = train_test_split(
-        X_scaled, y_finish, test_size=0.2, random_state=42
+        X_finish, y_finish, test_size=0.2, random_state=42
     )
 
-    # 3. Fit Logistic Regression
-    log_reg = LogisticRegression(max_iter=1000, random_state=42)
-    log_reg.fit(X_train_finish, y_train_finish)
+    # Apply scaling to finish model data
+    finish_scaler = StandardScaler()
+    X_train_finish_scaled = finish_scaler.fit_transform(X_train_finish)
+    X_test_finish_scaled = finish_scaler.transform(X_test_finish)
 
-    # 4. Predictions and Evaluation
-    y_pred_finish = log_reg.predict(X_test_finish)
+    # Train a Logistic Regression model with scaled data for finish prediction
+    log_reg = LogisticRegression(max_iter=1000, random_state=42)
+    log_reg.fit(X_train_finish_scaled, y_train_finish)
+
+    # Predictions and Evaluation on scaled data
+    y_pred_finish = log_reg.predict(X_test_finish_scaled)
     accuracy = accuracy_score(y_test_finish, y_pred_finish)
-    print(f"Logistic Regression Finish Prediction - Accuracy: {accuracy:.4f}")
+    print(f"Logistic Regression Finish Prediction (Scaled) - Accuracy: {accuracy:.4f}")
     print("\nClassification Report:\n", classification_report(y_test_finish, y_pred_finish))
     print("\nConfusion Matrix:\n", confusion_matrix(y_test_finish, y_pred_finish))
 
-    # 5. AUC-ROC Score (for multiclass)
-    y_proba = log_reg.predict_proba(X_test_finish)  # Probabilities for all classes
+    # AUC-ROC Score (for multiclass)
+    y_proba = log_reg.predict_proba(X_test_finish_scaled)  # Probabilities for all classes
     auc_score = roc_auc_score(y_test_finish, y_proba, multi_class='ovr')  # Multi-class One-vs-Rest strategy
     print(f"\nAUC-ROC Score (Multiclass OVR): {auc_score:.4f}")
 
-    # 6. Plot AUC-ROC Curve
-    # Binarize the labels for ROC curve
+    # Plot AUC-ROC Curve
     classes = np.unique(y_test_finish)
     y_test_bin = label_binarize(y_test_finish, classes=classes)
 
-    # Compute ROC curve and ROC area for each class
     fpr = dict()
     tpr = dict()
     roc_auc = dict()
@@ -228,9 +209,7 @@ def train_models():
         fpr[i], tpr[i], _ = roc_curve(y_test_bin[:, i], y_proba[:, i])
         roc_auc[i] = auc(fpr[i], tpr[i])
 
-    # Plot all ROC curves
     plt.figure(figsize=(10, 8))
-
     colors = ['blue', 'green', 'red']
     for i, color in zip(range(len(classes)), colors):
         plt.plot(fpr[i], tpr[i], color=color, lw=2,
@@ -247,12 +226,12 @@ def train_models():
     plt.savefig('models/finish_model_roc.png')
     plt.close()
     
-    # Save models
-    print("Saving models...")
+    # Save models and scalers
+    print("Saving models and scalers...")
     os.makedirs('models', exist_ok=True)
-    joblib.dump(svm, 'models/winner_model.pkl')
-    joblib.dump(winner_scaler, 'models/winner_scaler.pkl')
+    joblib.dump(log_reg_winner, 'models/winner_model.pkl')
     joblib.dump(log_reg, 'models/finish_model.pkl')
+    joblib.dump(winner_scaler, 'models/winner_scaler.pkl')
     joblib.dump(finish_scaler, 'models/finish_scaler.pkl')
     
     # Save the exact feature lists to ensure prediction uses the same features

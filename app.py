@@ -5,6 +5,7 @@ import plotly.graph_objects as go
 import joblib
 import os
 from utils.visualization import display_fight_prediction, plot_prediction_confidence
+from utils.preprocess import preprocess_winner_input, preprocess_finish_input
 from about import show_about_page
 from io import StringIO
 import sys
@@ -72,8 +73,7 @@ def load_models():
     try:
         winner_model = joblib.load('models/winner_model.pkl')
         finish_model = joblib.load('models/finish_model.pkl')
-        finish_scaler = joblib.load('models/finish_scaler.pkl')
-        return winner_model, finish_model, finish_scaler
+        return winner_model, finish_model, None
     except:
         st.error("Error loading models. Please make sure the models are trained and saved correctly.")
         return None, None, None
@@ -84,8 +84,7 @@ def load_cached_models():
     try:
         winner_model = joblib.load('models/winner_model.pkl')
         finish_model = joblib.load('models/finish_model.pkl')
-        finish_scaler = joblib.load('models/finish_scaler.pkl')
-        return winner_model, finish_model, finish_scaler
+        return winner_model, finish_model, None
     except Exception as e:
         st.error(f"Error loading models: {str(e)}")
         return None, None, None
@@ -109,9 +108,9 @@ def show_prediction_page():
     st.markdown("<h2 class='sub-header'>Predict fight outcomes with machine learning</h2>", unsafe_allow_html=True)
     
     # Load models
-    winner_model, finish_model, finish_scaler = load_models()
+    winner_model, finish_model, _ = load_models()
     
-    if not winner_model or not finish_model or not finish_scaler:
+    if not winner_model or not finish_model:
         st.warning("Please train the models first by running 'python train_models.py'")
         return
     
@@ -260,42 +259,75 @@ def show_prediction_page():
         with st.spinner("Analyzing fight data..."):
             # Make predictions
             try:
-                # Load the exact features the model was trained on
-                winner_features = joblib.load('models/winner_features.pkl')
-                winner_scaler = joblib.load('models/winner_scaler.pkl')
+                # Use the preprocessing utilities to properly scale the data
+                winner_input_scaled = preprocess_winner_input(fight_data)
                 
-                # Ensure all required columns exist in fight_data
-                for col in winner_features:
-                    if col not in fight_data.columns:
-                        fight_data[col] = 0  # Default to 0 for missing columns
-                
-                # Filter and scale the data exactly as it was done during training
-                winner_input_data = fight_data[winner_features]
-                winner_input_scaled = winner_scaler.transform(winner_input_data)
-                
-                # Make winner prediction with scaled data
+                # Make winner prediction using properly scaled data
                 winner_pred = winner_model.predict(winner_input_scaled)[0]
                 winner_proba = winner_model.predict_proba(winner_input_scaled)[0]
             except Exception as e:
                 st.error(f"Error making prediction: {str(e)}")
-                st.write("Falling back to unscaled prediction method")
+                st.write("Falling back to alternative prediction method")
                 
-                # Fallback to current method if there's a problem
-                if hasattr(winner_model, 'get_booster'):
-                    winner_features = winner_model.get_booster().feature_names
-                else:
-                    winner_features = [col for col in fight_data.columns if col not in [
-                        'RedDecOdds', 'BlueDecOdds', 'RSubOdds', 'BSubOdds', 'RKOOdds', 'BKOOdds'
-                    ]]
-                
-                winner_input_data = fight_data[winner_features]
-                winner_pred = winner_model.predict(winner_input_data)[0]
-                winner_proba = winner_model.predict_proba(winner_input_data)[0]
+                # Fallback to simple approach with manual scaling
+                try:
+                    # Load the scaler if available
+                    winner_scaler = joblib.load('models/winner_scaler.pkl')
+                    winner_features = joblib.load('models/winner_features.pkl')
+                    
+                    # Ensure all required columns exist in fight_data
+                    for col in winner_features:
+                        if col not in fight_data.columns:
+                            fight_data[col] = 0
+                    
+                    winner_input_data = fight_data[winner_features]
+                    winner_input_scaled = winner_scaler.transform(winner_input_data)
+                    
+                    winner_pred = winner_model.predict(winner_input_scaled)[0]
+                    winner_proba = winner_model.predict_proba(winner_input_scaled)[0]
+                except:
+                    # Last resort - try unscaled prediction
+                    if hasattr(winner_model, 'get_booster'):
+                        winner_features = winner_model.get_booster().feature_names
+                    else:
+                        winner_features = [col for col in fight_data.columns if col not in [
+                            'RedDecOdds', 'BlueDecOdds', 'RSubOdds', 'BSubOdds', 'RKOOdds', 'BKOOdds'
+                        ]]
+                    
+                    winner_input_data = fight_data[winner_features]
+                    winner_pred = winner_model.predict(winner_input_data)[0]
+                    winner_proba = winner_model.predict_proba(winner_input_data)[0]
             
-            # For finish model, use the scaler and all available features
-            scaled_data = finish_scaler.transform(fight_data)
-            finish_pred = finish_model.predict(scaled_data)[0]
-            finish_proba = finish_model.predict_proba(scaled_data)[0]
+            # For finish model, use preprocessing utility
+            try:
+                finish_input_scaled = preprocess_finish_input(fight_data)
+                
+                # Make finish prediction with scaled data
+                finish_pred = finish_model.predict(finish_input_scaled)[0]
+                finish_proba = finish_model.predict_proba(finish_input_scaled)[0]
+            except Exception as e:
+                st.error(f"Error making finish prediction: {str(e)}")
+                # Fallback to manual scaling
+                try:
+                    finish_features = joblib.load('models/finish_features.pkl')
+                    finish_scaler = joblib.load('models/finish_scaler.pkl')
+                    
+                    finish_input_data = pd.DataFrame(index=[0])
+                    for feature in finish_features:
+                        if feature in fight_data.columns:
+                            finish_input_data[feature] = fight_data[feature].values[0]
+                        else:
+                            finish_input_data[feature] = 0
+                            
+                    finish_input_scaled = finish_scaler.transform(finish_input_data)
+                    finish_pred = finish_model.predict(finish_input_scaled)[0]
+                    finish_proba = finish_model.predict_proba(finish_input_scaled)[0]
+                except:
+                    # Last resort fallback
+                    finish_features = joblib.load('models/finish_features.pkl')
+                    finish_input_data = fight_data[finish_features]
+                    finish_pred = finish_model.predict(finish_input_data)[0]
+                    finish_proba = finish_model.predict_proba(finish_input_data)[0]
             
             # Display visualizations using custom gauge charts instead of bar plots
             st.subheader("Prediction Visualizations")
@@ -464,40 +496,85 @@ def show_batch_predictions_page():
             progress_bar = st.progress(0)
             results = []
             
+            # Load models once before loop for efficiency
+            winner_model, finish_model, _ = load_cached_models()
+            if not winner_model or not finish_model:
+                st.error("Failed to load prediction models")
+                return
+                
             for index, row in processed_df.iterrows():
                 # Update progress
                 progress = (index + 1) / len(processed_df)
                 progress_bar.progress(progress)
                 
-                # Extract features - now use a dictionary with all columns from the processed DataFrame
-                features = row.to_dict()
+                # Create a DataFrame with the current fight's data
+                fight_data = pd.DataFrame([row.to_dict()])
                 
-                # Use existing prediction model
-                prediction = predict_fight_winner(features)
-                
-                # Get actual fighter names
-                red_fighter = row['RedFighter']
-                blue_fighter = row['BlueFighter']
-                
-                # Determine the predicted winner name
-                if prediction['winner'] == 'RedFighter':
-                    predicted_winner = red_fighter
-                    winner_color = 'red'
-                else:
-                    predicted_winner = blue_fighter
-                    winner_color = 'blue'
-                
-                # Store results
-                results.append({
-                    'RedFighter': red_fighter,
-                    'BlueFighter': blue_fighter,
-                    'WeightClass': row['WeightClass'] if 'WeightClass' in row else 'N/A',
-                    'PredictedWinner': predicted_winner,
-                    'WinnerColor': winner_color,
-                    'Confidence': f"{prediction['confidence'] * 100:.1f}%",
-                    'Method': prediction['method'],
-                    'MethodConfidence': f"{prediction['method_confidence']}%"
-                })
+                # Make prediction using utilities that handle scaling
+                try:
+                    # Process data for winner prediction
+                    winner_input_scaled = preprocess_winner_input(fight_data)
+                    
+                    # Make winner prediction using scaled data
+                    winner_pred = winner_model.predict(winner_input_scaled)[0]
+                    winner_proba = winner_model.predict_proba(winner_input_scaled)[0]
+                    
+                    # Apply temperature scaling for more reasonable probabilities
+                    if np.max(winner_proba) > 0.95:
+                        temperature = 2.0
+                        logits = np.log(winner_proba / (1 - winner_proba + 1e-10))
+                        winner_proba = np.exp(logits / temperature) / np.sum(np.exp(logits / temperature))
+                    
+                    # Process data for finish prediction
+                    finish_input_scaled = preprocess_finish_input(fight_data) 
+                    
+                    # Make finish prediction
+                    finish_pred = finish_model.predict(finish_input_scaled)[0]
+                    finish_proba = finish_model.predict_proba(finish_input_scaled)[0]
+                    
+                    # Apply temperature scaling for finish probabilities
+                    if np.max(finish_proba) > 0.95:
+                        temperature = 2.0
+                        logits = np.log(finish_proba / (1 - finish_proba + 1e-10))
+                        finish_proba = np.exp(logits / temperature) / np.sum(np.exp(logits / temperature))
+                    
+                    # Get actual fighter names
+                    red_fighter = row['RedFighter']
+                    blue_fighter = row['BlueFighter']
+                    
+                    # Determine the predicted winner name
+                    predicted_winner = red_fighter if winner_pred == 0 else blue_fighter
+                    winner_color = 'red' if winner_pred == 0 else 'blue'
+                    
+                    # Get finish type
+                    finish_types = ['KO/TKO', 'Submission', 'Decision']
+                    finish_type = finish_types[finish_pred]
+                    finish_confidence = round(finish_proba[finish_pred] * 100, 1)
+                    
+                    # Store results
+                    results.append({
+                        'RedFighter': red_fighter,
+                        'BlueFighter': blue_fighter,
+                        'WeightClass': row['WeightClass'] if 'WeightClass' in row else 'N/A',
+                        'PredictedWinner': predicted_winner,
+                        'WinnerColor': winner_color,
+                        'Confidence': round(winner_proba[winner_pred] * 100, 1),
+                        'Method': finish_type,
+                        'MethodConfidence': finish_confidence
+                    })
+                except Exception as e:
+                    st.error(f"Error processing fight {index+1}: {str(e)}")
+                    # Add error entry
+                    results.append({
+                        'RedFighter': row.get('RedFighter', f'Fighter {index*2+1}'),
+                        'BlueFighter': row.get('BlueFighter', f'Fighter {index*2+2}'),
+                        'WeightClass': row.get('WeightClass', 'N/A'),
+                        'PredictedWinner': 'Error',
+                        'WinnerColor': 'N/A',
+                        'Confidence': 0.0,
+                        'Method': 'Error',
+                        'MethodConfidence': 0.0
+                    })
             
             # Display results in a table with colored winners
             st.subheader("Prediction Results")
@@ -521,97 +598,6 @@ def show_batch_predictions_page():
             st.error(f"Error processing file: {str(e)}")
             st.error("Stack trace:")
             st.exception(e)
-
-def extract_features_for_prediction(row):
-    """Extract relevant features from a row of the CSV file for prediction."""
-    features = {}
-    
-    # Map all available columns from CSV to features dict
-    for col in row.index:
-        if not pd.isna(row[col]):
-            features[col] = row[col]
-    
-    # Calculate differential features like in the main app
-    features['WinStreakDif'] = features.get('RedCurrentWinStreak', 0) - features.get('BlueCurrentWinStreak', 0)
-    features['LoseStreakDif'] = features.get('RedCurrentLoseStreak', 0) - features.get('BlueCurrentLoseStreak', 0)
-    features['HeightDif'] = features.get('RedHeightCms', 0) - features.get('BlueHeightCms', 0)
-    features['ReachDif'] = features.get('RedReachCms', 0) - features.get('BlueReachCms', 0)
-    features['AgeDif'] = features.get('RedAge', 0) - features.get('BlueAge', 0)
-    features['SigStrDif'] = features.get('RedAvgSigStrLanded', 0) - features.get('BlueAvgSigStrLanded', 0)
-    features['AvgSubAttDif'] = features.get('RedAvgSubAtt', 0) - features.get('BlueAvgSubAtt', 0)
-    features['AvgTDDif'] = features.get('RedAvgTDLanded', 0) - features.get('BlueAvgTDLanded', 0)
-    
-    # Convert boolean values 
-    if 'TitleBout' in features:
-        features['TitleBout'] = 1 if features['TitleBout'] else 0
-    
-    return features
-
-def predict_fight_winner(features):
-    """Use the existing prediction model to predict the fight winner."""
-    try:
-        # Load models only once per session using st.cache_resource
-        winner_model, finish_model, finish_scaler = load_cached_models()
-        
-        # Load features and scaler
-        winner_features = joblib.load('models/winner_features.pkl')
-        winner_scaler = joblib.load('models/winner_scaler.pkl')
-        
-        # Create a DataFrame with all necessary columns for the winner model
-        winner_df = pd.DataFrame(index=[0])
-        for feature in winner_features:
-            if feature in features:
-                winner_df[feature] = features[feature]
-            else:
-                winner_df[feature] = 0
-        
-        # Scale the features
-        winner_input_scaled = winner_scaler.transform(winner_df)
-        
-        # Make winner prediction
-        winner_pred = winner_model.predict(winner_input_scaled)[0]
-        winner_proba = winner_model.predict_proba(winner_input_scaled)[0]
-        
-        # For finish prediction, load the exact finish features used during training
-        finish_features = joblib.load('models/finish_features.pkl')
-        
-        # Create DataFrame for finish prediction with exact same columns as training
-        finish_df = pd.DataFrame(index=[0])
-        for feature in finish_features:
-            if feature in features:
-                finish_df[feature] = features[feature]
-            else:
-                finish_df[feature] = 0
-        
-        # Use the same scaling approach as in training
-        scaled_finish_data = finish_scaler.transform(finish_df)
-        
-        # Make predictions with scaled data
-        finish_pred = finish_model.predict(scaled_finish_data)[0]
-        finish_proba = finish_model.predict_proba(scaled_finish_data)[0]
-        
-        # Map finish prediction to human-readable string
-        finish_types = ['KO/TKO', 'Submission', 'Decision']
-        finish_type = finish_types[finish_pred]
-        finish_confidence = round(finish_proba[finish_pred] * 100, 1)
-        
-        return {
-            'winner': 'RedFighter' if winner_pred == 0 else 'BlueFighter',
-            'confidence': round(winner_proba[winner_pred], 2),
-            'method': finish_type,
-            'method_confidence': finish_confidence
-        }
-    except Exception as e:
-        st.error(f"Error in prediction: {str(e)}")
-        # If there's an error loading features or predictions, log it and use a default
-        st.exception(e)
-        return {
-            'winner': 'Error',
-            'confidence': 0.5,
-            'method': 'Error',
-            'method_confidence': 0,
-            'error': str(e)
-        }
 
 if __name__ == "__main__":
     main()

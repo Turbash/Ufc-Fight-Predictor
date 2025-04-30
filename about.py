@@ -14,9 +14,9 @@ def show_about_page():
     
     The application uses two primary machine learning models:
     
-    1. **Winner Prediction Model**: Analyzes fighter statistics to determine the likely winner between two opponents.
+    1. **Winner Prediction Model**: Simple Logistic Regression model that analyzes fighter statistics to determine the likely winner between two opponents. Achieves ~66% accuracy.
     
-    2. **Finish Type Model**: Predicts how the fight will end - KO/TKO, Submission, or Decision.
+    2. **Finish Type Model**: Another Logistic Regression model that predicts how the fight will end - KO/TKO, Submission, or Decision. Achieves ~55% accuracy.
     
     The models are trained on historical UFC fight data, considering factors such as:
     
@@ -34,8 +34,10 @@ def show_about_page():
     
     The current version of our models achieves:
     
-    - Winner prediction accuracy: ~70%
-    - Fight finish method accuracy: ~65%
+    - Winner prediction accuracy: ~66%
+    - AUC-ROC for winner prediction: 0.71
+    - Fight finish method accuracy: ~55%
+    - AUC-ROC for finish method (multiclass): 0.65
     
     These accuracy rates are comparable to or better than the accuracy of betting odds in predicting outcomes.
     

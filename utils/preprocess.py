@@ -1,54 +1,45 @@
 import joblib
 import pandas as pd
 import numpy as np
-from sklearn.preprocessing import StandardScaler
-
-def scale_features(df):
-    scaler = StandardScaler()
-    scaled_features = scaler.fit_transform(df)
-    return scaled_features, scaler
 
 def preprocess_winner_data(input_data):
     df = load_and_preprocess_data(input_data)
     
-    # Define the exact 39 features to use (matching what the model was trained on)
-    winner_features = ['RedOdds', 'BlueOdds', 'RedAvgSigStrLanded', 'BlueAvgSigStrLanded', 
-                  'RedCurrentWinStreak', 'BlueCurrentWinStreak', 'RedHeightCms', 
-                  'BlueHeightCms', 'RedReachCms', 'BlueReachCms',
-                  'RedAvgSigStrPct', 'BlueAvgSigStrPct', 'RedAvgSubAtt', 'BlueAvgSubAtt',
-                  'RedAvgTDLanded', 'BlueAvgTDLanded', 'RedAvgTDPct', 'BlueAvgTDPct',
-                  'RedWins', 'BlueWins', 'RedLosses', 'BlueLosses',
-                  'SigStrDif', 'HeightDif', 'ReachDif', 'AgeDif', 'AvgSubAttDif',
-                  'AvgTDDif', 'WinStreakDif', 'LoseStreakDif', 'TotalRoundDif',
-                  'RedAge', 'BlueAge', 'RedWeightLbs', 'BlueWeightLbs', 
-                  'RedTotalRoundsFought', 'BlueTotalRoundsFought',
-                  'RedWinsByKO', 'BlueWinsByKO']
-    # Note: Removed 'WinDif' from the feature list to match the 39 features model expects
+    # Load the exact features the winner model was trained on
+    try:
+        winner_features = joblib.load('models/winner_features.pkl')
+    except:
+        # Fall back to a default list of features if the file is not found
+        winner_features = ['RedOdds', 'BlueOdds', 'RedAvgSigStrLanded', 'BlueAvgSigStrLanded', 
+                      'RedCurrentWinStreak', 'BlueCurrentWinStreak', 'RedHeightCms', 
+                      'BlueHeightCms', 'RedReachCms', 'BlueReachCms',
+                      'RedAvgSigStrPct', 'BlueAvgSigStrPct', 'RedAvgSubAtt', 'BlueAvgSubAtt',
+                      'RedAvgTDLanded', 'BlueAvgTDLanded', 'RedAvgTDPct', 'BlueAvgTDPct',
+                      'RedWins', 'BlueWins', 'RedLosses', 'BlueLosses',
+                      'SigStrDif', 'HeightDif', 'ReachDif', 'AgeDif', 'AvgSubAttDif',
+                      'AvgTDDif', 'WinStreakDif', 'LoseStreakDif', 'TotalRoundDif',
+                      'RedAge', 'BlueAge', 'RedWeightLbs', 'BlueWeightLbs', 
+                      'RedTotalRoundsFought', 'BlueTotalRoundsFought',
+                      'RedWinsByKO', 'BlueWinsByKO']
     
     # Make sure all required columns exist
     for col in winner_features:
         if col not in df.columns:
             df[col] = 0  # Default to 0 for missing columns
     
-    # Add a safety check: ensure we ONLY use the 39 columns the model was trained on
-    # This prevents the "X has N features but model expects M features" error
+    # Select only the columns the model was trained on
     df_selected = df[winner_features].copy()
     
-    # Double check feature count
-    expected_feature_count = 39
-    actual_feature_count = df_selected.shape[1]
-    
-    if actual_feature_count != expected_feature_count:
-        raise ValueError(f"Feature count mismatch: Expected {expected_feature_count} but got {actual_feature_count}")
-    
-    # Scale the features
-    scaled_features, scaler = scale_features(df_selected)
-    
-    # Final verification
-    if scaled_features.shape[1] != expected_feature_count:
-        raise ValueError(f"Scaled feature count mismatch: Expected {expected_feature_count} but got {scaled_features.shape[1]}")
-    
-    return scaled_features, scaler
+    # Apply scaling using the same scaler used during training
+    try:
+        # Load the scaler used during training
+        winner_scaler = joblib.load('models/winner_scaler.pkl')
+        df_scaled = winner_scaler.transform(df_selected)
+        return df_scaled
+    except:
+        # If scaler isn't found, return unscaled data with a warning
+        print("Warning: Winner scaler not found. Using unscaled data.")
+        return df_selected
 
 def preprocess_finish_data(input_data):
     df = load_and_preprocess_data(input_data)
@@ -72,24 +63,24 @@ def preprocess_finish_data(input_data):
             'RKOOdds', 'BKOOdds'
         ]
     
-    # Create a new DataFrame with just the required features
+    # Create a DataFrame with just the required features
     finish_data = pd.DataFrame(index=[0])
     for feature in finish_features:
         if feature in df.columns:
             finish_data[feature] = df[feature]
         else:
             finish_data[feature] = 0
-            
-    # Scale the features as was done during training
+    
+    # Apply scaling using the same scaler used during training
     try:
+        # Load the scaler used during training
         finish_scaler = joblib.load('models/finish_scaler.pkl')
-        scaled_features = finish_scaler.transform(finish_data)
+        finish_data_scaled = finish_scaler.transform(finish_data)
+        return finish_data_scaled
     except:
-        # If we can't load the scaler, create one
-        scaler = StandardScaler()
-        scaled_features = scaler.fit_transform(finish_data)
-        
-    return scaled_features, finish_scaler if 'finish_scaler' in locals() else scaler
+        # If scaler isn't found, return unscaled data with a warning
+        print("Warning: Finish scaler not found. Using unscaled data.")
+        return finish_data
 
 # Add wrapper functions to match the imports in __init__.py
 def preprocess_winner_input(input_data):
