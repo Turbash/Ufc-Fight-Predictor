@@ -57,19 +57,39 @@ def preprocess_finish_data(input_data):
     try:
         finish_features = joblib.load('models/finish_features.pkl')
     except:
-        # Fallback to default features
-        finish_features = ['RedAvgSigStrLanded', 'BlueAvgSigStrLanded', 'RedAvgTDLanded', 
-                      'BlueAvgTDLanded', 'RedAvgSubAtt', 'BlueAvgSubAtt', 
-                      'RedCurrentWinStreak', 'BlueCurrentWinStreak']
+        # If we can't load the features, use a default set based on training script
+        finish_features = [
+            'RedOdds', 'BlueOdds', 'RedExpectedValue', 'BlueExpectedValue',
+            'TitleBout', 'NumberOfRounds', 'RedCurrentLoseStreak', 'BlueCurrentLoseStreak',
+            'RedCurrentWinStreak', 'BlueCurrentWinStreak', 'RedAvgSigStrLanded', 'BlueAvgSigStrLanded',
+            'RedAvgSigStrPct', 'BlueAvgSigStrPct', 'RedAvgSubAtt', 'BlueAvgSubAtt',
+            'RedAvgTDLanded', 'BlueAvgTDLanded', 'RedWinsByKO', 'BlueWinsByKO',
+            'RedWinsBySubmission', 'BlueWinsBySubmission', 'RedWinsByDecisionUnanimous',
+            'BlueWinsByDecisionUnanimous', 'RedWins', 'BlueWins', 'RedHeightCms',
+            'BlueHeightCms', 'RedReachCms', 'BlueReachCms', 'RedWeightLbs', 'BlueWeightLbs',
+            'WinStreakDif', 'LoseStreakDif', 'HeightDif', 'ReachDif', 'AgeDif', 'SigStrDif',
+            'AvgSubAttDif', 'AvgTDDif', 'RedDecOdds', 'BlueDecOdds', 'RSubOdds', 'BSubOdds',
+            'RKOOdds', 'BKOOdds'
+        ]
     
-    # Make sure all required columns exist
-    for col in finish_features:
-        if col not in df.columns:
-            df[col] = 0  # Default to 0 for missing columns
+    # Create a new DataFrame with just the required features
+    finish_data = pd.DataFrame(index=[0])
+    for feature in finish_features:
+        if feature in df.columns:
+            finish_data[feature] = df[feature]
+        else:
+            finish_data[feature] = 0
             
-    features = df[finish_features]
-    scaled_features, scaler = scale_features(features)
-    return scaled_features, scaler
+    # Scale the features as was done during training
+    try:
+        finish_scaler = joblib.load('models/finish_scaler.pkl')
+        scaled_features = finish_scaler.transform(finish_data)
+    except:
+        # If we can't load the scaler, create one
+        scaler = StandardScaler()
+        scaled_features = scaler.fit_transform(finish_data)
+        
+    return scaled_features, finish_scaler if 'finish_scaler' in locals() else scaler
 
 # Add wrapper functions to match the imports in __init__.py
 def preprocess_winner_input(input_data):

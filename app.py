@@ -6,6 +6,15 @@ import joblib
 import os
 from utils.visualization import display_fight_prediction, plot_prediction_confidence
 from about import show_about_page
+from io import StringIO
+import sys
+sys.path.append('.')
+try:
+    from extract_features import extract_all_features_from_csv
+except ImportError:
+    # Define a simplified version if the module is not available
+    def extract_all_features_from_csv(df):
+        return df
 
 # Set page configuration
 st.set_page_config(
@@ -69,14 +78,28 @@ def load_models():
         st.error("Error loading models. Please make sure the models are trained and saved correctly.")
         return None, None, None
 
+@st.cache_resource
+def load_cached_models():
+    """Load and cache the prediction models"""
+    try:
+        winner_model = joblib.load('models/winner_model.pkl')
+        finish_model = joblib.load('models/finish_model.pkl')
+        finish_scaler = joblib.load('models/finish_scaler.pkl')
+        return winner_model, finish_model, finish_scaler
+    except Exception as e:
+        st.error(f"Error loading models: {str(e)}")
+        return None, None, None
+
 def main():
     # Sidebar navigation
     st.sidebar.image("https://upload.wikimedia.org/wikipedia/commons/thumb/9/92/UFC_Logo.svg/2560px-UFC_Logo.svg.png", width=200)
     st.sidebar.title("Navigation")
-    page = st.sidebar.radio("Go to", ["Prediction Tool", "About"])
+    page = st.sidebar.radio("Go to", ["Prediction Tool", "Batch Predictions", "About"])
     
     if page == "About":
         show_about_page()
+    elif page == "Batch Predictions":
+        show_batch_predictions_page()
     else:
         show_prediction_page()
 
@@ -386,13 +409,209 @@ def show_prediction_page():
             st.markdown("<h3>Fighter Comparison</h3>", unsafe_allow_html=True)
             comparison_data = {
                 "Stat": ["Win Streak", "Sig. Strikes/Min", "Accuracy", "Takedowns/Fight", "KO Wins", "Sub Wins", "Height", "Reach"],
-                red_fighter_name: [red_win_streak, red_sig_str, f"{red_sig_str_pct*100:.1f}%", red_td_landed, 
-                                  red_ko_wins, red_sub_wins, f"{red_height} cm", f"{red_reach} cm"],
-                blue_fighter_name: [blue_win_streak, blue_sig_str, f"{blue_sig_str_pct*100:.1f}%", blue_td_landed, 
-                                   blue_ko_wins, blue_sub_wins, f"{blue_height} cm", f"{blue_reach} cm"]
+                red_fighter_name: [red_win_streak, red_sig_str, red_sig_str_pct*100, red_td_landed, 
+                                  red_ko_wins, red_sub_wins, red_height, red_reach],
+                blue_fighter_name: [blue_win_streak, blue_sig_str, blue_sig_str_pct*100, blue_td_landed, 
+                                   blue_ko_wins, blue_sub_wins, blue_height, blue_reach]
             }
             comparison_df = pd.DataFrame(comparison_data)
-            st.dataframe(comparison_df, use_container_width=True, hide_index=True)
+            
+            # Create a formatter function to apply custom formatting to specific rows
+            def format_df(df):
+                # Create a copy to avoid modifying the original
+                formatted_df = df.copy()
+                
+                # Format the accuracy row (index 2) to show as percentage
+                for col in formatted_df.columns:
+                    if col != "Stat" and len(formatted_df) > 2:
+                        formatted_df.loc[2, col] = f"{formatted_df.loc[2, col]:.1f}%"
+                
+                # Format height and reach rows to show units
+                for col in formatted_df.columns:
+                    if col != "Stat":
+                        if len(formatted_df) > 6:  # Height row
+                            formatted_df.loc[6, col] = f"{formatted_df.loc[6, col]} cm"
+                        if len(formatted_df) > 7:  # Reach row
+                            formatted_df.loc[7, col] = f"{formatted_df.loc[7, col]} cm"
+                
+                return formatted_df
+            
+            # Apply formatting and display
+            st.dataframe(format_df(comparison_df), use_container_width=True, hide_index=True)
+
+def show_batch_predictions_page():
+    # Header
+    st.markdown("<h1 class='main-header'>Batch Fight Predictions</h1>", unsafe_allow_html=True)
+    st.markdown("<h2 class='sub-header'>Upload a CSV file to predict multiple fight outcomes</h2>", unsafe_allow_html=True)
+    
+    # File upload
+    uploaded_file = st.file_uploader("Upload CSV", type=["csv"])
+    
+    if uploaded_file is not None:
+        try:
+            # Read CSV content
+            df = pd.read_csv(uploaded_file)
+            
+            # Show preview of uploaded data
+            st.subheader("Uploaded Data Preview")
+            st.dataframe(df.head(), use_container_width=True)
+            
+            # Preprocess the DataFrame to ensure all necessary features are present
+            processed_df = extract_all_features_from_csv(df)
+            
+            # Process each fight and generate predictions
+            st.subheader("Generating Predictions...")
+            progress_bar = st.progress(0)
+            results = []
+            
+            for index, row in processed_df.iterrows():
+                # Update progress
+                progress = (index + 1) / len(processed_df)
+                progress_bar.progress(progress)
+                
+                # Extract features - now use a dictionary with all columns from the processed DataFrame
+                features = row.to_dict()
+                
+                # Use existing prediction model
+                prediction = predict_fight_winner(features)
+                
+                # Get actual fighter names
+                red_fighter = row['RedFighter']
+                blue_fighter = row['BlueFighter']
+                
+                # Determine the predicted winner name
+                if prediction['winner'] == 'RedFighter':
+                    predicted_winner = red_fighter
+                    winner_color = 'red'
+                else:
+                    predicted_winner = blue_fighter
+                    winner_color = 'blue'
+                
+                # Store results
+                results.append({
+                    'RedFighter': red_fighter,
+                    'BlueFighter': blue_fighter,
+                    'WeightClass': row['WeightClass'] if 'WeightClass' in row else 'N/A',
+                    'PredictedWinner': predicted_winner,
+                    'WinnerColor': winner_color,
+                    'Confidence': f"{prediction['confidence'] * 100:.1f}%",
+                    'Method': prediction['method'],
+                    'MethodConfidence': f"{prediction['method_confidence']}%"
+                })
+            
+            # Display results in a table with colored winners
+            st.subheader("Prediction Results")
+            results_df = pd.DataFrame(results)
+            
+            # Apply color formatting using custom HTML
+            formatted_df = results_df.copy()
+            formatted_df = formatted_df.drop(columns=['WinnerColor']) if 'WinnerColor' in formatted_df.columns else formatted_df
+            st.dataframe(formatted_df, use_container_width=True, hide_index=True)
+            
+            # Option to download results
+            csv = results_df.drop(columns=['WinnerColor'] if 'WinnerColor' in results_df.columns else []).to_csv(index=False)
+            st.download_button(
+                label="Download Predictions as CSV",
+                data=csv,
+                file_name='fight_predictions.csv',
+                mime='text/csv',
+            )
+            
+        except Exception as e:
+            st.error(f"Error processing file: {str(e)}")
+            st.error("Stack trace:")
+            st.exception(e)
+
+def extract_features_for_prediction(row):
+    """Extract relevant features from a row of the CSV file for prediction."""
+    features = {}
+    
+    # Map all available columns from CSV to features dict
+    for col in row.index:
+        if not pd.isna(row[col]):
+            features[col] = row[col]
+    
+    # Calculate differential features like in the main app
+    features['WinStreakDif'] = features.get('RedCurrentWinStreak', 0) - features.get('BlueCurrentWinStreak', 0)
+    features['LoseStreakDif'] = features.get('RedCurrentLoseStreak', 0) - features.get('BlueCurrentLoseStreak', 0)
+    features['HeightDif'] = features.get('RedHeightCms', 0) - features.get('BlueHeightCms', 0)
+    features['ReachDif'] = features.get('RedReachCms', 0) - features.get('BlueReachCms', 0)
+    features['AgeDif'] = features.get('RedAge', 0) - features.get('BlueAge', 0)
+    features['SigStrDif'] = features.get('RedAvgSigStrLanded', 0) - features.get('BlueAvgSigStrLanded', 0)
+    features['AvgSubAttDif'] = features.get('RedAvgSubAtt', 0) - features.get('BlueAvgSubAtt', 0)
+    features['AvgTDDif'] = features.get('RedAvgTDLanded', 0) - features.get('BlueAvgTDLanded', 0)
+    
+    # Convert boolean values 
+    if 'TitleBout' in features:
+        features['TitleBout'] = 1 if features['TitleBout'] else 0
+    
+    return features
+
+def predict_fight_winner(features):
+    """Use the existing prediction model to predict the fight winner."""
+    try:
+        # Load models only once per session using st.cache_resource
+        winner_model, finish_model, finish_scaler = load_cached_models()
+        
+        # Load features and scaler
+        winner_features = joblib.load('models/winner_features.pkl')
+        winner_scaler = joblib.load('models/winner_scaler.pkl')
+        
+        # Create a DataFrame with all necessary columns for the winner model
+        winner_df = pd.DataFrame(index=[0])
+        for feature in winner_features:
+            if feature in features:
+                winner_df[feature] = features[feature]
+            else:
+                winner_df[feature] = 0
+        
+        # Scale the features
+        winner_input_scaled = winner_scaler.transform(winner_df)
+        
+        # Make winner prediction
+        winner_pred = winner_model.predict(winner_input_scaled)[0]
+        winner_proba = winner_model.predict_proba(winner_input_scaled)[0]
+        
+        # For finish prediction, load the exact finish features used during training
+        finish_features = joblib.load('models/finish_features.pkl')
+        
+        # Create DataFrame for finish prediction with exact same columns as training
+        finish_df = pd.DataFrame(index=[0])
+        for feature in finish_features:
+            if feature in features:
+                finish_df[feature] = features[feature]
+            else:
+                finish_df[feature] = 0
+        
+        # Use the same scaling approach as in training
+        scaled_finish_data = finish_scaler.transform(finish_df)
+        
+        # Make predictions with scaled data
+        finish_pred = finish_model.predict(scaled_finish_data)[0]
+        finish_proba = finish_model.predict_proba(scaled_finish_data)[0]
+        
+        # Map finish prediction to human-readable string
+        finish_types = ['KO/TKO', 'Submission', 'Decision']
+        finish_type = finish_types[finish_pred]
+        finish_confidence = round(finish_proba[finish_pred] * 100, 1)
+        
+        return {
+            'winner': 'RedFighter' if winner_pred == 0 else 'BlueFighter',
+            'confidence': round(winner_proba[winner_pred], 2),
+            'method': finish_type,
+            'method_confidence': finish_confidence
+        }
+    except Exception as e:
+        st.error(f"Error in prediction: {str(e)}")
+        # If there's an error loading features or predictions, log it and use a default
+        st.exception(e)
+        return {
+            'winner': 'Error',
+            'confidence': 0.5,
+            'method': 'Error',
+            'method_confidence': 0,
+            'error': str(e)
+        }
 
 if __name__ == "__main__":
     main()
