@@ -84,16 +84,18 @@ def plot_prediction_confidence(probabilities, classes, prediction, title="Predic
     plt.show()
 
 def display_fight_prediction(winner_model, finish_model, finish_scaler, fight_data, red_fighter, blue_fighter):
-    # Get features that the winner model was trained on
+    # Get features that the winner model was trained on - optimized for gradient boosted trees
     try:
         import joblib
         winner_features = joblib.load('models/winner_features.pkl')
     except Exception as e:
-        # Fallback if feature list can't be loaded
-        if hasattr(winner_model, 'get_booster'):
+        # For gradient boosted tree models, try to extract feature names directly
+        if hasattr(winner_model, 'feature_names_'):
+            winner_features = winner_model.feature_names_
+        elif hasattr(winner_model, 'get_booster') and hasattr(winner_model.get_booster(), 'feature_names'):
             winner_features = winner_model.get_booster().feature_names
         else:
-            # For models that don't have direct feature name access
+            # Fallback for other gradient boosted tree implementations
             winner_features = [col for col in fight_data.columns if col not in [
                 'RedDecOdds', 'BlueDecOdds', 'RSubOdds', 'BSubOdds', 'RKOOdds', 'BKOOdds'
             ]]
@@ -116,50 +118,69 @@ def display_fight_prediction(winner_model, finish_model, finish_scaler, fight_da
         winner_pred = winner_model.predict(winner_data_scaled)[0]
         winner_proba = winner_model.predict_proba(winner_data_scaled)[0]
         
-        # Apply temperature scaling to adjust overconfident predictions
-        if np.max(winner_proba) > 0.95:
-            temperature = 2.0  # Higher temperature gives softer probabilities
+        # For gradient boosted trees, apply additional calibration to probabilities if needed
+        if np.max(winner_proba) > 0.9 or np.min(winner_proba) < 0.1:
+            # Apply Platt scaling equivalent for better calibrated probabilities
+            temperature = 1.5  # Lower temperature for GBT models
             logits = np.log(winner_proba / (1 - winner_proba + 1e-10))
-            softmax_probs = np.exp(logits / temperature) / np.sum(np.exp(logits / temperature))
-            winner_proba = softmax_probs
+            winner_proba = 1/(1 + np.exp(-logits/temperature))
+            winner_proba = winner_proba / np.sum(winner_proba)  # Normalize
     except:
         # Fall back to unscaled prediction if scaler can't be loaded
         winner_pred = winner_model.predict(winner_data)[0]
         winner_proba = winner_model.predict_proba(winner_data)[0]
     
-    # Determine winner name based on prediction (0 = Red, 1 = Blue)
+    # IMPORTANT: This ensures 0 = Red fighter and 1 = Blue fighter consistently across the application
     winner_name = red_fighter if winner_pred == 0 else blue_fighter
     
-    # For finish model, use features and apply scaling
+    # For finish model, optimize for gradient boosted trees
     try:
         finish_features = joblib.load('models/finish_features.pkl')
-        finish_data = fight_data[finish_features]
+    except Exception as e:
+        # For gradient boosted trees, try to extract feature names directly
+        if hasattr(finish_model, 'feature_names_'):
+            finish_features = finish_model.feature_names_
+        elif hasattr(finish_model, 'get_booster') and hasattr(finish_model.get_booster(), 'feature_names'):
+            finish_features = finish_model.get_booster().feature_names
+        else:
+            # Use the same features as winner model as fallback
+            finish_features = winner_features
         
-        # Load and apply finish scaler
-        finish_scaler = joblib.load('models/finish_scaler.pkl')
-        finish_data_scaled = finish_scaler.transform(finish_data)
+    # Ensure all required columns exist in fight_data
+    for col in finish_features:
+        if col not in fight_data.columns:
+            fight_data[col] = 0  # Default to 0 for missing columns
+    
+    # Filter fight_data to only include columns expected by the finish model
+    finish_data = fight_data[finish_features]
+    
+    # Apply scaling to finish data using the saved scaler
+    try:
+        # Use the provided finish scaler if available
+        if finish_scaler is not None:
+            finish_data_scaled = finish_scaler.transform(finish_data)
+        else:
+            # Load scaler if not provided
+            finish_scaler = joblib.load('models/finish_scaler.pkl')
+            finish_data_scaled = finish_scaler.transform(finish_data)
         
         # Predict using scaled data
         finish_pred = finish_model.predict(finish_data_scaled)[0]
         finish_proba = finish_model.predict_proba(finish_data_scaled)[0]
-    except:
+        
+        # Apply similar calibration for finish prediction probabilities
+        if np.max(finish_proba) > 0.9 or np.min(finish_proba) < 0.1:
+            temperature = 1.5
+            logits = np.log(finish_proba / (1 - finish_proba + 1e-10))
+            finish_proba = 1/(1 + np.exp(-logits/temperature))
+            finish_proba = finish_proba / np.sum(finish_proba)  # Normalize
+    except Exception as e:
         # Fall back to unscaled prediction if there's an issue
-        if finish_features is None:
-            finish_data = winner_data  # Use same features as winner if finish features not found
-        else:
-            finish_data = fight_data[finish_features]
-            
         finish_pred = finish_model.predict(finish_data)[0]
         finish_proba = finish_model.predict_proba(finish_data)[0]
     
-    # Apply similar temperature scaling to finish probabilities if needed
-    if np.max(finish_proba) > 0.95:
-        temperature = 2.0
-        logits = np.log(finish_proba / (1 - finish_proba + 1e-10))
-        softmax_probs = np.exp(logits / temperature) / np.sum(np.exp(logits / temperature))
-        finish_proba = softmax_probs
-
-    finish_types = ['KO/TKO', 'Submission', 'Decision']
+    # Updated to use only 2 classes for finish prediction
+    finish_types = ['Finish', 'Decision']
     finish_type = finish_types[finish_pred]
     
     # Display predictions with proper styling
@@ -174,10 +195,23 @@ def display_fight_prediction(winner_model, finish_model, finish_scaler, fight_da
     print(f"📊 CONFIDENCE: {round(finish_proba[finish_pred] * 100, 1)}%")
     print("\n" + "="*50)
     
-    # Plot visual representations
+    # Plot visual representations - ensure red is index 0, blue is index 1
+    # This maintains the Red=0, Blue=1 mapping in visualizations
     winner_classes = [red_fighter, blue_fighter]
     plot_prediction_confidence(winner_proba, winner_classes, winner_classes[winner_pred], 
                               "Winner Prediction Confidence")
     
     plot_prediction_confidence(finish_proba, finish_types, finish_types[finish_pred],
                               "Finish Type Prediction Confidence")
+    
+    # Return the prediction results for potential further use
+    results = {
+        'winner_pred': winner_pred,
+        'winner_proba': winner_proba,
+        'winner_name': winner_name,
+        'finish_pred': finish_pred,
+        'finish_proba': finish_proba,
+        'finish_type': finish_type
+    }
+    
+    return results

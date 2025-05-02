@@ -7,34 +7,35 @@ A machine learning application that predicts UFC fight outcomes based on fighter
 ## 📋 Features
 
 - Predict fight winners with confidence percentages
-- Predict fight finish methods (KO/TKO, Submission, Decision)
-- Interactive UI for inputting fighter statistics
-- Visual representation of prediction results
-- Fighter comparison dashboard
+- Predict fight outcomes (Finish or Decision)
+- Interactive modern UI with beautiful visualizations
+- Batch prediction capabilities via CSV upload
+- Fighter comparison dashboard with modern charts
 - Comprehensive fighter stats input (physical attributes, fight history, performance metrics)
+- Betting odds integration
 
 ## 🚀 Technologies Used
 
-- Python
+- Python 3.9+
 - Streamlit
-- Pandas
-- NumPy
-- Plotly
+- Pandas & NumPy
+- Plotly & Matplotlib
 - Scikit-learn
+- XGBoost
 - Joblib
 
 ## 📊 How It Works
 
-The UFC Fight Predictor uses trained machine learning models to analyze fighter statistics and predict:
-1. The likely winner between two fighters (using simple Logistic Regression, ~66% accuracy)
-2. The probable method of victory (KO/TKO, Submission, or Decision) (~55% accuracy)
+The UFC Fight Predictor uses ensemble machine learning models to analyze fighter statistics and predict:
+1. The likely winner between two fighters (~67% accuracy)
+2. Whether the fight will end via finish or decision (~58% accuracy)
 
 The models take into account numerous factors such as:
 - Fighter physical attributes (height, reach, age)
 - Fighting style and statistics (striking accuracy, takedowns, etc.)
 - Past performance (win/loss records, winning methods)
 - Current form (win/loss streaks)
-- Betting odds
+- Betting odds and market sentiment
 
 ## 🛠️ Installation
 
@@ -67,25 +68,32 @@ The models take into account numerous factors such as:
 
 ## 📝 Usage
 
-1. Launch the application using the command above
-2. Input fighter statistics for both the red and blue corner fighters
-3. Add fight-specific information such as odds and weight class
-4. Click "Predict Fight Outcome" to see the results
-5. Review the visualizations and fighter comparison
+### Single Fight Prediction
+1. Input fighter statistics for both the red and blue corner fighters
+2. Add fight-specific information such as odds and rounds
+3. Click "Predict Fight Outcome" to see the results
+4. Review the visualizations and fighter comparison charts
+
+### Batch Predictions
+1. Navigate to the "Batch Predictions" page
+2. Upload a CSV file containing multiple fights (template available)
+3. Review the prediction results table
+4. Analyze the batch results visualizations
+5. Download the predictions as CSV
 
 ## 📈 Model Performance
 
 Our models currently achieve:
-- **Winner prediction**: ~66% accuracy (AUC-ROC: 0.71)
-- **Finish method**: ~55% accuracy (AUC-ROC: 0.65)
+- **Winner prediction**: ~67% accuracy (AUC-ROC: 0.72)
+- **Finish prediction**: ~58% accuracy (AUC-ROC: 0.65)
 
 ## 📚 Project Structure
 
 - `app.py`: Main Streamlit application
 - `train_models.py`: Script to train prediction models
 - `models/`: Directory containing trained models
-- `utils/`: Utility functions for visualization and data processing
-- `about.py`: About page content
+- `utils/`: Utility functions for visualization, data processing, and feature importance
+- `about.py`: About page content with project information
 
 ## 📜 License
 
@@ -97,4 +105,8 @@ MIT License
 
 ## 🤝 Contributing
 
-Contributions, issues, and feature requests are welcome!
+Contributions, issues, and feature requests are welcome! Feel free to check the issues page.
+
+## ⚠️ Disclaimer
+
+This application is for entertainment and educational purposes only. Predictions should not be used as the sole basis for betting decisions. UFC® is a registered trademark of Zuffa LLC. This project is not affiliated with UFC® or Zuffa LLC.

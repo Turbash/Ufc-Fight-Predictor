@@ -1,80 +1,111 @@
 import streamlit as st
 
 def show_about_page():
-    st.markdown("<h1 style='text-align: center; color: #E50914;'>About UFC Fight Predictor</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center; color: #d20a0a;'>About UFC Fight Predictor</h1>", unsafe_allow_html=True)
     
-    st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/9/92/UFC_Logo.svg/2560px-UFC_Logo.svg.png", width=300)
-    
+    # Introduction section
     st.markdown("""
-    ## Project Overview
+    <div style="background: linear-gradient(145deg, #1a1e25 0%, #2c3e50 100%); padding: 20px; border-radius: 10px; margin-bottom: 20px; border-left: 5px solid #ffc107;">
+        <h2 style="color: #ffc107;">Introduction</h2>
+        <p style="color: #ffffff; font-size: 1.1rem; line-height: 1.6;">
+            UFC Fight Predictor is a machine learning application designed to predict the outcomes of UFC fights. 
+            Using historical fight data and advanced algorithms, the system can predict both the winner of a fight and 
+            whether the fight will end via finish (KO/TKO/Submission) or go to a decision.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
     
-    UFC Fight Predictor is a machine learning application designed to predict the outcomes of UFC fights. Using historical fighter data, statistical analysis, and machine learning algorithms, this tool provides insights into potential winners and how fights might end.
-    
-    ## How It Works
-    
-    The application uses two primary machine learning models:
-    
-    1. **Winner Prediction Model**: Simple Logistic Regression model that analyzes fighter statistics to determine the likely winner between two opponents. Achieves ~66% accuracy.
-    
-    2. **Finish Type Model**: Another Logistic Regression model that predicts how the fight will end - KO/TKO, Submission, or Decision. Achieves ~55% accuracy.
-    
-    The models are trained on historical UFC fight data, considering factors such as:
-    
-    - Physical attributes (height, reach, weight)
-    - Technical performance (strike accuracy, takedowns, submissions)
-    - Fight history (wins, losses, methods of victory)
-    - Current form (win/loss streaks)
-    - Betting odds and market expectations
-    
-    ## Data Sources
-    
-    This project utilizes data compiled from various public UFC statistics sources. The dataset includes detailed information about fighters, their performances, and fight outcomes going back several years.
-    
-    ## Model Performance
-    
-    The current version of our models achieves:
-    
-    - Winner prediction accuracy: ~66%
-    - AUC-ROC for winner prediction: 0.71
-    - Fight finish method accuracy: ~55%
-    - AUC-ROC for finish method (multiclass): 0.65
-    
-    These accuracy rates are comparable to or better than the accuracy of betting odds in predicting outcomes.
-    
-    ## Limitations
-    
-    While our models provide valuable insights, they have limitations:
-    
-    - They cannot account for undisclosed injuries or personal factors
-    - Last-minute fight changes may affect prediction accuracy
-    - The unpredictable nature of combat sports means upsets will happen
-    
-    ## Future Improvements
-    
-    We're constantly working to improve the models with:
-    
-    - More granular fight data
-    - Advanced feature engineering
-    - Incorporation of momentum and trend analysis
-    - Consideration of stylistic matchups
-    
-    ## Credits
-    
-    Developed by [Turbash](https://github.com/Turbash)
-    
-    ## Feedback & Contributions
-    
-    Feedback, bug reports, and contributions are welcome on the [GitHub repository](https://github.com/Turbash/Ufc-Fight-Predictor).
-    """)
-    
-    # Add disclaimer
-    st.markdown("---")
+    # How it works section
     st.markdown("""
-    **Disclaimer:** This application is intended for entertainment and informational purposes only. 
-    It should not be used as the sole basis for betting or gambling decisions. Always gamble responsibly.
-    """)
+    <div style="background: linear-gradient(145deg, #1a1e25 0%, #2c3e50 100%); padding: 20px; border-radius: 10px; margin-bottom: 20px; border-left: 5px solid #d20a0a;">
+        <h2 style="color: #d20a0a;">How It Works</h2>
+        <p style="color: #ffffff; font-size: 1.1rem; line-height: 1.6;">
+            The prediction system uses ensemble machine learning models trained on thousands of historical UFC fights.
+            These models analyze various factors including:
+        </p>
+        <ul style="color: #ffffff; font-size: 1.1rem; line-height: 1.6;">
+            <li>Fighter physical attributes (height, reach, age)</li>
+            <li>Fight records and win streaks</li>
+            <li>Performance statistics (striking accuracy, takedowns, etc.)</li>
+            <li>Betting odds and market sentiment</li>
+            <li>Fighting styles and matchup dynamics</li>
+        </ul>
+        <p style="color: #ffffff; font-size: 1.1rem; line-height: 1.6;">
+            The system then processes this information to generate probability-based predictions for fight outcomes.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
     
-    # Add contact section
-    st.sidebar.markdown("---")
-    st.sidebar.markdown("### Contact")
-    st.sidebar.markdown("[GitHub](https://github.com/Turbash)")
+    # Features section
+    st.markdown("""
+    <div style="background: linear-gradient(145deg, #1a1e25 0%, #2c3e50 100%); padding: 20px; border-radius: 10px; margin-bottom: 20px; border-left: 5px solid #0a7ad2;">
+        <h2 style="color: #0a7ad2;">Key Features</h2>
+        <ul style="color: #ffffff; font-size: 1.1rem; line-height: 1.6;">
+            <li><strong>Single Fight Prediction:</strong> Input fighter details to get winner and finish predictions</li>
+            <li><strong>Batch Predictions:</strong> Upload CSV files with multiple fights for efficient analysis</li>
+            <li><strong>Probability-Based Results:</strong> See confidence levels for each prediction</li>
+            <li><strong>Visual Analytics:</strong> Interactive charts and visualizations of prediction factors</li>
+            <li><strong>Fighter Comparison:</strong> Side-by-side comparison of fighter attributes</li>
+        </ul>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Limitations & Disclaimer
+    st.markdown("""
+    <div style="background: linear-gradient(145deg, #1a1e25 0%, #2c3e50 100%); padding: 20px; border-radius: 10px; margin-bottom: 20px; border-left: 5px solid #ffc107;">
+        <h2 style="color: #ffc107;">Limitations & Disclaimer</h2>
+        <p style="color: #ffffff; font-size: 1.1rem; line-height: 1.6;">
+            While this application uses advanced machine learning techniques, please keep in mind:
+        </p>
+        <ul style="color: #ffffff; font-size: 1.1rem; line-height: 1.6;">
+            <li>No prediction system can account for all variables in combat sports</li>
+            <li>Last-minute changes (injuries, weight cut issues) may not be reflected</li>
+            <li>The emotional and psychological aspects of fighting are difficult to quantify</li>
+            <li>This tool is for entertainment and educational purposes only</li>
+            <li>We do not recommend making betting decisions solely based on these predictions</li>
+        </ul>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Technology stack
+    st.markdown("""
+    <div style="background: linear-gradient(145deg, #1a1e25 0%, #2c3e50 100%); padding: 20px; border-radius: 10px; margin-bottom: 20px; border-left: 5px solid #28a745;">
+        <h2 style="color: #28a745;">Technology Stack</h2>
+        <p style="color: #ffffff; font-size: 1.1rem; line-height: 1.6;">
+            This application is built using:
+        </p>
+        <ul style="color: #ffffff; font-size: 1.1rem; line-height: 1.6;">
+            <li><strong>Python:</strong> Core programming language</li>
+            <li><strong>Streamlit:</strong> Web application framework</li>
+            <li><strong>Scikit-learn:</strong> Machine learning algorithms</li>
+            <li><strong>XGBoost:</strong> Gradient boosting implementation</li>
+            <li><strong>Pandas & NumPy:</strong> Data manipulation</li>
+            <li><strong>Plotly & Matplotlib:</strong> Data visualization</li>
+        </ul>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Contact & Feedback
+    st.markdown("""
+    <div style="background: linear-gradient(145deg, #1a1e25 0%, #2c3e50 100%); padding: 20px; border-radius: 10px; border-left: 5px solid #d20a0a;">
+        <h2 style="color: #d20a0a;">Contact & Feedback</h2>
+        <p style="color: #ffffff; font-size: 1.1rem; line-height: 1.6;">
+            We're constantly working to improve our predictions. If you have suggestions, comments, 
+            or would like to contribute to the project, please visit:
+        </p>
+        <p style="text-align: center; margin-top: 20px;">
+            <a href="https://github.com/Turbash/Ufc-Fight-Predictor" target="_blank" style="background-color: #ffc107; color: #000; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold;">GitHub Repository</a>
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Footer
+    st.markdown("""
+    <div style="text-align: center; margin-top: 30px; color: #7f8c8d; font-size: 0.9rem;">
+        <p>© 2025 UFC Fight Predictor | Not affiliated with UFC® or Zuffa LLC</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+# Test the about page when run directly
+if __name__ == "__main__":
+    show_about_page()
